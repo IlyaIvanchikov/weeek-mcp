@@ -18,7 +18,9 @@ claude mcp add weeek -s user -- npx -y weeek-mcp-smart
 
 ## Install (Claude Desktop, one click)
 
-Download `weeek-mcp-smart.mcpb` from Releases and open it — you'll be prompted for your token.
+**[⬇ Download the latest `.mcpb`](https://github.com/IlyaIvanchikov/weeek-mcp/releases/latest/download/weeek-mcp-smart.mcpb)**, then open it in Claude Desktop (Settings → Extensions → install from file). You'll be prompted for your WEEEK API token — it's stored in your OS keychain.
+
+All releases: https://github.com/IlyaIvanchikov/weeek-mcp/releases
 
 ## Get a token
 
