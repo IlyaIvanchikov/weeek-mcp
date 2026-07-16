@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "pack:mcpb": "bash scripts/pack-mcpb.sh"
+    "pack:mcpb": "bash scripts/pack-mcpb.sh",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
