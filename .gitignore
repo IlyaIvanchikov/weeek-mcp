@@ -3,3 +3,4 @@ dist/
 server/
 *.mcpb
 .superpowers/
+PROMOTE.md
