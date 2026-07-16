@@ -1,0 +1,13 @@
+node_modules/
+src/
+tests/
+docs/
+.superpowers/
+.git/
+dist/
+package-lock.json
+tsconfig.json
+vitest.config.ts
+scripts/
+*.mcpb
+.gitignore

@@ -1,0 +1,25 @@
+{
+  "manifest_version": "0.3",
+  "name": "weeek-mcp-smart",
+  "version": "0.1.0",
+  "description": "WEEEK tasks by name, not IDs",
+  "author": { "name": "Ilya Ivanchikov" },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": { "WEEEK_API_TOKEN": "${user_config.weeek_api_token}" }
+    }
+  },
+  "user_config": {
+    "weeek_api_token": {
+      "type": "string",
+      "title": "WEEEK API Token",
+      "description": "Create one at WEEEK → Settings → API",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}
