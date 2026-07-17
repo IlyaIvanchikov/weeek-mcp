@@ -1,17 +1,35 @@
 {
   "name": "weeek-mcp-smart",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "WEEEK tasks by name, not IDs — an MCP server",
-  "keywords": ["mcp", "model-context-protocol", "weeek", "claude", "task-tracker", "productivity"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "weeek",
+    "claude",
+    "task-tracker",
+    "productivity"
+  ],
   "license": "MIT",
   "author": "Ilya Ivanchikov",
-  "repository": { "type": "git", "url": "git+https://github.com/IlyaIvanchikov/weeek-mcp.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IlyaIvanchikov/weeek-mcp.git"
+  },
   "homepage": "https://github.com/IlyaIvanchikov/weeek-mcp#readme",
-  "bugs": { "url": "https://github.com/IlyaIvanchikov/weeek-mcp/issues" },
+  "bugs": {
+    "url": "https://github.com/IlyaIvanchikov/weeek-mcp/issues"
+  },
   "type": "module",
-  "bin": { "weeek-mcp-smart": "dist/index.js" },
-  "files": ["dist"],
-  "engines": { "node": ">=18" },
+  "bin": {
+    "weeek-mcp-smart": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
