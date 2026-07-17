@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WeeekClient, CreateTaskBody } from "../client.js";
 import type { Resolver } from "../resolver.js";
@@ -68,15 +70,36 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
 
   server.tool(
     "weeek_update_task",
-    "Update an existing WEEEK task's title, description, or due date.",
-    { id: z.number().int(), title: z.string().optional(), description: z.string().optional(), due: z.string().optional() },
+    "Update an existing WEEEK task's title or due date. NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set the description at create time (weeek_create_task) or edit it in the UI.",
+    { id: z.number().int(), title: z.string().optional(), due: z.string().optional() },
     async (args) => {
       try {
         const patch: Record<string, unknown> = {};
         if (args.title !== undefined) patch.title = args.title;
-        if (args.description !== undefined) patch.description = args.description;
         if (args.due !== undefined) patch.dayFrom = parseDueDate(args.due);
         return jsonReply(await client.updateTask(args.id, patch));
+      } catch (err) { return errorReply(err); }
+    },
+  );
+
+  server.tool(
+    "weeek_delete_task",
+    "Delete a WEEEK task by id. Permanent — the task is removed, not just completed.",
+    { id: z.number().int() },
+    async (args) => {
+      try { return jsonReply(await client.deleteTask(args.id)); }
+      catch (err) { return errorReply(err); }
+    },
+  );
+
+  server.tool(
+    "weeek_attach_file",
+    "Attach a local file to a WEEEK task, given the task id and a path to the file on disk.",
+    { task_id: z.number().int(), path: z.string() },
+    async (args) => {
+      try {
+        const data = await readFile(args.path);
+        return jsonReply(await client.attachFile(args.task_id, basename(args.path), data));
       } catch (err) { return errorReply(err); }
     },
   );

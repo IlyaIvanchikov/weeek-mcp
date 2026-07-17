@@ -11,6 +11,7 @@ export interface CreateTaskBody {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
 }
+export interface Attachment { id: string; name: string; url: string; size: number; }
 
 type Query = Record<string, string | number | undefined>;
 
@@ -24,15 +25,20 @@ export class WeeekClient {
     }
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
+    // Multipart (file upload) bodies must NOT get a JSON content-type — fetch sets
+    // the multipart boundary itself. JSON bodies keep the explicit header.
+    const isForm = typeof FormData !== "undefined" && opts.body instanceof FormData;
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.cfg.token}` };
+    if (!isForm) headers["content-type"] = "application/json";
     let res: Response;
     try {
       res = await this.fetchImpl(url, {
         method,
-        headers: {
-          Authorization: `Bearer ${this.cfg.token}`,
-          "content-type": "application/json",
-        },
-        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        headers,
+        body:
+          opts.body === undefined ? undefined
+          : isForm ? (opts.body as FormData)
+          : JSON.stringify(opts.body),
         signal: ctrl.signal,
       });
     } catch (err) {
@@ -115,6 +121,16 @@ export class WeeekClient {
   async updateTask(id: number, patch: Record<string, unknown>): Promise<WeeekTask> {
     const j = await this.request<{ task: unknown }>("PUT", `/tm/tasks/${id}`, { body: patch });
     return WeeekClient.toTask(j.task);
+  }
+  async deleteTask(id: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>("DELETE", `/tm/tasks/${id}`);
+  }
+  async attachFile(id: number, filename: string, data: Uint8Array | Blob): Promise<Attachment[]> {
+    const form = new FormData();
+    const blob = data instanceof Blob ? data : new Blob([data as BlobPart]);
+    form.append("files[]", blob, filename);
+    const j = await this.request<{ data?: unknown }>("POST", `/tm/tasks/${id}/attachments`, { body: form });
+    return (Array.isArray(j.data) ? j.data : []) as Attachment[];
   }
   async moveTask(id: number, boardId: number, boardColumnId: number): Promise<WeeekTask> {
     await this.request("POST", `/tm/tasks/${id}/board`, { body: { boardId } });

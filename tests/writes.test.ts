@@ -5,6 +5,8 @@ import { registerWriteTools } from "../src/tools/writes.js";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";
 
+vi.mock("node:fs/promises", () => ({ readFile: vi.fn(async () => new Uint8Array([1, 2, 3])) }));
+
 // The real MCP server parses raw tool-call args against the tool's zod schema shape
 // (via z.object(shape).parse(rawArgs)) before invoking the handler. The mocked
 // `server.tool` below replays that same parse step so these tests exercise real
@@ -84,6 +86,30 @@ describe("write tools", () => {
       expect.arrayContaining([expect.objectContaining({ id: 1, name: "Marketing" })]),
     );
     expect(createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("update_task never sends description (WEEEK ignores it) even if a caller passes one", async () => {
+    const updateTask = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, updateTask });
+    await h.get("weeek_update_task")!({ id: 3, title: "New", description: "should be dropped" });
+    expect(updateTask).toHaveBeenCalledWith(3, { title: "New" });
+    expect(updateTask.mock.calls[0][1]).not.toHaveProperty("description");
+  });
+
+  it("delete_task calls deleteTask", async () => {
+    const deleteTask = vi.fn(async (_id: number) => ({ success: true }));
+    const h = harness({ ...baseClient, deleteTask });
+    const res = await h.get("weeek_delete_task")!({ id: 42 });
+    expect(deleteTask).toHaveBeenCalledWith(42);
+    expect(JSON.parse(res.content[0].text)).toEqual({ success: true });
+  });
+
+  it("attach_file reads the path and uploads under its basename", async () => {
+    const attachFile = vi.fn(async () => [{ id: "a1", name: "server-analysis.md", url: "http://x", size: 3 }]);
+    const h = harness({ ...baseClient, attachFile });
+    const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "/some/dir/server-analysis.md" });
+    expect(attachFile).toHaveBeenCalledWith(70, "server-analysis.md", expect.anything());
+    expect(JSON.parse(res.content[0].text)[0].id).toBe("a1");
   });
 
   it("complete_task calls setCompleted", async () => {

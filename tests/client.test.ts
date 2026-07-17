@@ -63,6 +63,31 @@ describe("WeeekClient", () => {
     expect((init as RequestInit).method).toBe("POST");
   });
 
+  it("deleteTask sends DELETE to /tm/tasks/{id}", async () => {
+    const f = fakeFetch(200, { success: true });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    expect(await c.deleteTask(9)).toEqual({ success: true });
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe("https://api.weeek.net/public/v1/tm/tasks/9");
+    expect((init as RequestInit).method).toBe("DELETE");
+  });
+
+  it("attachFile posts multipart files[] to /attachments and returns the data array", async () => {
+    const att = { id: "a1", name: "f.md", url: "http://x", size: 3 };
+    const f = fakeFetch(200, { success: true, data: [att] });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const out = await c.attachFile(7, "f.md", new Uint8Array([1, 2, 3]));
+    expect(out).toEqual([att]);
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe("https://api.weeek.net/public/v1/tm/tasks/7/attachments");
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).body).toBeInstanceOf(FormData);
+    // multipart must NOT carry a JSON content-type (fetch sets the boundary itself)
+    expect((init as RequestInit).headers).not.toHaveProperty("content-type");
+    const file = (init as RequestInit).body as FormData;
+    expect((file.get("files[]") as File).name).toBe("f.md");
+  });
+
   it("moveTask posts board then board-column, then fetches the task", async () => {
     const f = fakeFetch(200, { success: true, task: { id: 7, title: "T", description: null, projectId: 1, boardColumnId: 4, completed: false } });
     const c = new WeeekClient(cfg, f as unknown as typeof fetch);
