@@ -35,10 +35,12 @@ const createShape = {
 };
 
 export function registerWriteTools(server: McpServer, client: WeeekClient, resolver: Resolver): void {
-  server.tool(
+  server.registerTool(
     "weeek_create_task",
-    "Create a WEEEK task. Accepts project/column/assignee by NAME or id, and a natural-language `due` date. One call — no need to look up ids first. Omit `assignee` to self-assign (WEEEK assigns the token owner); pass a member name/id to assign someone else. Reassigning an existing task is not supported by the WEEEK public API — set the assignee at creation.",
-    createShape,
+    {
+      description: "Create a WEEEK task. Accepts project/column/assignee by NAME or id, and a natural-language `due` date. One call — no need to look up ids first. Omit `assignee` to self-assign (WEEEK assigns the token owner); pass a member name/id to assign someone else. Reassigning an existing task is not supported by the WEEEK public API — set the assignee at creation.",
+      inputSchema: createShape,
+    },
     async (args) => {
       try {
         const body = await buildCreateBody(resolver, args as CreateInput);
@@ -47,10 +49,12 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_create_tasks",
-    "Create many WEEEK tasks in one call. Returns a per-item report; one bad name does not abort the batch.",
-    { tasks: z.array(z.object(createShape)).min(1).max(50) },
+    {
+      description: "Create many WEEEK tasks in one call. Returns a per-item report; one bad name does not abort the batch.",
+      inputSchema: { tasks: z.array(z.object(createShape)).min(1).max(50) },
+    },
     async (args) => {
       const report: Array<{ ok: boolean; task?: unknown; error?: string; candidates?: unknown }> = [];
       for (const t of args.tasks) {
@@ -68,10 +72,12 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_update_task",
-    "Update an existing WEEEK task's title or due date. NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set the description at create time (weeek_create_task) or edit it in the UI.",
-    { id: z.number().int(), title: z.string().optional(), due: z.string().optional() },
+    {
+      description: "Update an existing WEEEK task's title or due date. NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set the description at create time (weeek_create_task) or edit it in the UI.",
+      inputSchema: { id: z.number().int(), title: z.string().optional(), due: z.string().optional() },
+    },
     async (args) => {
       try {
         const patch: Record<string, unknown> = {};
@@ -82,20 +88,18 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_delete_task",
-    "Delete a WEEEK task by id. Permanent — the task is removed, not just completed.",
-    { id: z.number().int() },
+    { description: "Delete a WEEEK task by id. Permanent — the task is removed, not just completed.", inputSchema: { id: z.number().int() } },
     async (args) => {
       try { return jsonReply(await client.deleteTask(args.id)); }
       catch (err) { return errorReply(err); }
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_attach_file",
-    "Attach a local file to a WEEEK task, given the task id and a path to the file on disk.",
-    { task_id: z.number().int(), path: z.string() },
+    { description: "Attach a local file to a WEEEK task, given the task id and a path to the file on disk.", inputSchema: { task_id: z.number().int(), path: z.string() } },
     async (args) => {
       try {
         const data = await readFile(args.path);
@@ -104,10 +108,9 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_move_task",
-    "Move a WEEEK task to a column (by name or id, scoped to the given board) on that board.",
-    { id: z.number().int(), board_id: z.number().int(), column: nameOrId },
+    { description: "Move a WEEEK task to a column (by name or id, scoped to the given board) on that board.", inputSchema: { id: z.number().int(), board_id: z.number().int(), column: nameOrId } },
     async (args) => {
       try {
         const columnId = await resolver.resolveColumnInBoard(args.board_id, args.column);
@@ -116,10 +119,9 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
     },
   );
 
-  server.tool(
+  server.registerTool(
     "weeek_complete_task",
-    "Mark a WEEEK task complete, or reopen it (completed:false).",
-    { id: z.number().int(), completed: z.boolean() },
+    { description: "Mark a WEEEK task complete, or reopen it (completed:false).", inputSchema: { id: z.number().int(), completed: z.boolean() } },
     async (args) => {
       try { return jsonReply(await client.setCompleted(args.id, args.completed)); }
       catch (err) { return errorReply(err); }

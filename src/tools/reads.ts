@@ -1,18 +1,31 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WeeekClient } from "../client.js";
+import { NAME, VERSION } from "../version.js";
 import { jsonReply, errorReply } from "./reply.js";
 
 export function registerReadTools(server: McpServer, client: WeeekClient): void {
-  server.tool("weeek_list_projects", "List WEEEK projects (id + name).", {}, async () => {
-    try { return jsonReply(await client.listProjects()); }
-    catch (err) { return errorReply(err); }
-  });
+  server.registerTool(
+    "weeek_version",
+    { description: "Return this MCP server's name and version, so callers can check which build is running.", inputSchema: {} },
+    async () => jsonReply({ name: NAME, version: VERSION }),
+  );
 
-  server.tool(
+  server.registerTool(
+    "weeek_list_projects",
+    { description: "List WEEEK projects (id + name).", inputSchema: {} },
+    async () => {
+      try { return jsonReply(await client.listProjects()); }
+      catch (err) { return errorReply(err); }
+    },
+  );
+
+  server.registerTool(
     "weeek_list_tasks",
-    "List WEEEK tasks. Optional projectId filter; paginated.",
-    { projectId: z.number().int().optional(), limit: z.number().int().min(1).max(50).default(20), offset: z.number().int().min(0).default(0) },
+    {
+      description: "List WEEEK tasks. Optional projectId filter; paginated.",
+      inputSchema: { projectId: z.number().int().optional(), limit: z.number().int().min(1).max(50).default(20), offset: z.number().int().min(0).default(0) },
+    },
     async (args) => {
       try {
         const query: Record<string, number> = {};
@@ -24,8 +37,12 @@ export function registerReadTools(server: McpServer, client: WeeekClient): void 
     },
   );
 
-  server.tool("weeek_get_task", "Get one WEEEK task by id.", { id: z.number().int() }, async (args) => {
-    try { return jsonReply(await client.getTask(args.id)); }
-    catch (err) { return errorReply(err); }
-  });
+  server.registerTool(
+    "weeek_get_task",
+    { description: "Get one WEEEK task by id.", inputSchema: { id: z.number().int() } },
+    async (args) => {
+      try { return jsonReply(await client.getTask(args.id)); }
+      catch (err) { return errorReply(err); }
+    },
+  );
 }

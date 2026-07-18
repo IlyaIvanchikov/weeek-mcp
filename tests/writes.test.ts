@@ -17,8 +17,8 @@ function harness(clientOver: Record<string, any>) {
   const resolver = new Resolver(client, new NameCache(100000, () => 0));
   const server = new McpServer({ name: "t", version: "0" });
   const handlers = new Map<string, Function>();
-  vi.spyOn(server, "tool").mockImplementation(((name: string, _d: any, shape: any, cb: Function) => {
-    const schema = z.object(shape ?? {});
+  vi.spyOn(server, "registerTool").mockImplementation(((name: string, config: any, cb: Function) => {
+    const schema = z.object(config?.inputSchema ?? {});
     handlers.set(name, (rawArgs: unknown) => cb(schema.parse(rawArgs)));
     return undefined as any;
   }) as any);

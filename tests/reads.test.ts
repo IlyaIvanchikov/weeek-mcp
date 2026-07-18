@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerReadTools } from "../src/tools/reads.js";
@@ -12,8 +13,8 @@ import { errorReply } from "../src/tools/reply.js";
 function harness(clientOver: Record<string, any>) {
   const server = new McpServer({ name: "t", version: "0" });
   const handlers = new Map<string, Function>();
-  vi.spyOn(server, "tool").mockImplementation(((name: string, _d: any, shape: any, cb: Function) => {
-    const schema = z.object(shape ?? {});
+  vi.spyOn(server, "registerTool").mockImplementation(((name: string, config: any, cb: Function) => {
+    const schema = z.object(config?.inputSchema ?? {});
     handlers.set(name, (rawArgs: unknown) => cb(schema.parse(rawArgs)));
     return undefined as any;
   }) as any);
@@ -26,6 +27,13 @@ describe("read tools", () => {
     const h = harness({ getTask: async (id: number) => ({ id, title: "T" }) });
     const res = await h.get("weeek_get_task")!({ id: 7 });
     expect(JSON.parse(res.content[0].text)).toEqual({ id: 7, title: "T" });
+  });
+
+  it("weeek_version returns the package name and version", async () => {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    const h = harness({});
+    const res = await h.get("weeek_version")!({});
+    expect(JSON.parse(res.content[0].text)).toEqual({ name: pkg.name, version: pkg.version });
   });
 
   it("weeek_list_projects returns the list", async () => {
