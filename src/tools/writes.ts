@@ -37,7 +37,7 @@ const createShape = {
 export function registerWriteTools(server: McpServer, client: WeeekClient, resolver: Resolver): void {
   server.tool(
     "weeek_create_task",
-    "Create a WEEEK task. Accepts project/column/assignee by NAME or id, and a natural-language `due` date. One call — no need to look up ids first.",
+    "Create a WEEEK task. Accepts project/column/assignee by NAME or id, and a natural-language `due` date. One call — no need to look up ids first. Omit `assignee` to self-assign (WEEEK assigns the token owner); pass a member name/id to assign someone else. Reassigning an existing task is not supported by the WEEEK public API — set the assignee at creation.",
     createShape,
     async (args) => {
       try {

@@ -5,7 +5,8 @@ export interface NamedEntity { id: number; name: string; }
 export interface Member { id: string; name: string; }
 export interface WeeekTask {
   id: number; title: string; description: string | null;
-  projectId: number | null; boardColumnId: number | null; completed: boolean;
+  projectId: number | null; boardId: number | null; boardColumnId: number | null;
+  assignees: string[]; completed: boolean;
 }
 export interface CreateTaskBody {
   title: string; projectId: number; boardColumnId?: number;
@@ -79,7 +80,11 @@ export class WeeekClient {
       title: String(raw.title ?? ""),
       description: raw.description ?? null,
       projectId: raw.projectId == null ? null : Number(raw.projectId),
+      boardId: raw.boardId == null ? null : Number(raw.boardId),
       boardColumnId: raw.boardColumnId == null ? null : Number(raw.boardColumnId),
+      // WEEEK assigns the task creator by default; the public API exposes assignees
+      // only as read-only here (no reachable endpoint mutates them after creation).
+      assignees: Array.isArray(raw.assignees) ? raw.assignees.map(String) : [],
       completed: Boolean(raw.isCompleted ?? raw.completed ?? false),
     };
   }

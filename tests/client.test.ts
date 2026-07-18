@@ -37,6 +37,25 @@ describe("WeeekClient", () => {
     });
   });
 
+  it("getTask surfaces assignees and boardId", async () => {
+    const f = fakeFetch(200, { success: true, task: {
+      id: 78, title: "T", description: null, projectId: 2,
+      boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"], isCompleted: false,
+    } });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const t = await c.getTask(78);
+    expect(t.assignees).toEqual(["a2318d51-uuid"]);
+    expect(t.boardId).toBe(3);
+  });
+
+  it("getTask defaults assignees to [] when the field is absent", async () => {
+    const f = fakeFetch(200, { success: true, task: { id: 1, title: "T", projectId: 2, boardColumnId: 8 } });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const t = await c.getTask(1);
+    expect(t.assignees).toEqual([]);
+    expect(t.boardId).toBeNull();
+  });
+
   it("throws WeeekApiError on non-2xx", async () => {
     const f = fakeFetch(404, { success: false, message: "nope" });
     const c = new WeeekClient(cfg, f as unknown as typeof fetch);
