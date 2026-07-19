@@ -28,5 +28,9 @@ WEEEK → Settings → API → generate a personal token.
 
 ## Tools
 
-Reads: `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`.
-Writes: `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`.
+Reads: `weeek_version`, `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`.
+Writes: `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`, `weeek_attach_file`, `weeek_delete_task`.
+
+## Author
+
+**Ilya Ivanchikov** — [GitHub](https://github.com/IlyaIvanchikov) · [LinkedIn](https://www.linkedin.com/in/ilyaivanchikov) · [Telegram](https://t.me/IlyaIvanchikov) · [Channel](https://t.me/ivanchikovitclub)
