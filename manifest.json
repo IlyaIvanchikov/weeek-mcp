@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "weeek-mcp-smart",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "WEEEK tasks by name, not IDs",
   "author": { "name": "Ilya Ivanchikov" },
   "server": {
