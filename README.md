@@ -26,6 +26,23 @@ All releases: https://github.com/IlyaIvanchikov/weeek-mcp/releases
 
 WEEEK → Settings → API → generate a personal token.
 
+## Configuration
+
+| Env var | Required | Default | Purpose |
+|---|---|---|---|
+| `WEEEK_API_TOKEN` | yes | — | Your WEEEK personal API token. |
+| `WEEEK_API_BASE_URL` | no | `https://api.weeek.net/public/v1` | Override for self-hosted / regional hosts. |
+| `WEEEK_TIMEOUT_MS` | no | `30000` | Per-request timeout. |
+| `WEEEK_ATTACH_DIR` | no | the server's working directory | Directory `weeek_attach_file` may read from (see Safety). |
+| `WEEEK_ATTACH_MAX_BYTES` | no | `10485760` (10 MB) | Max attachable file size. |
+
+## Safety
+
+This server is driven by an LLM that can read untrusted content (task text, web pages), so the two riskiest tools are guarded:
+
+- **`weeek_attach_file`** only reads files inside an allowed directory (its subfolders included). By default that's the server's **working directory** — so it works with no setup for local files, while paths outside it (`/etc/passwd`, `~/.ssh`, `..` traversal, symlinks that escape) are refused. Set `WEEEK_ATTACH_DIR` to point the jail somewhere specific or lock it down further. No special folder is required.
+- **`weeek_delete_task`** is permanent and requires an explicit `confirm: true`; to merely close a task use `weeek_complete_task`.
+
 ## Tools
 
 Reads: `weeek_version`, `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`.

@@ -4,6 +4,7 @@ import { basename } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WeeekClient, CreateTaskBody } from "../client.js";
 import type { Resolver } from "../resolver.js";
+import { resolveSafeAttachPath, type AttachPolicy } from "../attach.js";
 import { parseDueDate } from "../dates.js";
 import { jsonReply, errorReply } from "./reply.js";
 
@@ -34,7 +35,12 @@ const createShape = {
   description: z.string().optional(),
 };
 
-export function registerWriteTools(server: McpServer, client: WeeekClient, resolver: Resolver): void {
+export function registerWriteTools(
+  server: McpServer,
+  client: WeeekClient,
+  resolver: Resolver,
+  attachPolicy: AttachPolicy,
+): void {
   server.registerTool(
     "weeek_create_task",
     {
@@ -90,7 +96,15 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
 
   server.registerTool(
     "weeek_delete_task",
-    { description: "Delete a WEEEK task by id. Permanent — the task is removed, not just completed.", inputSchema: { id: z.number().int() } },
+    {
+      description:
+        "Permanently delete a WEEEK task by id. Irreversible — the task is removed, not just completed. Requires confirm:true; to merely close a task use weeek_complete_task instead.",
+      inputSchema: {
+        id: z.number().int(),
+        confirm: z.literal(true).describe("Must be true to confirm this irreversible deletion."),
+      },
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
     async (args) => {
       try { return jsonReply(await client.deleteTask(args.id)); }
       catch (err) { return errorReply(err); }
@@ -99,11 +113,17 @@ export function registerWriteTools(server: McpServer, client: WeeekClient, resol
 
   server.registerTool(
     "weeek_attach_file",
-    { description: "Attach a local file to a WEEEK task, given the task id and a path to the file on disk.", inputSchema: { task_id: z.number().int(), path: z.string() } },
+    {
+      description:
+        "Attach a local file to a WEEEK task. For safety only files inside the allowed directory (the server's working directory by default, or WEEEK_ATTACH_DIR if set) — and its subfolders — may be attached; paths outside it are refused.",
+      inputSchema: { task_id: z.number().int(), path: z.string() },
+      annotations: { openWorldHint: true },
+    },
     async (args) => {
       try {
-        const data = await readFile(args.path);
-        return jsonReply(await client.attachFile(args.task_id, basename(args.path), data));
+        const safePath = await resolveSafeAttachPath(args.path, attachPolicy);
+        const data = await readFile(safePath);
+        return jsonReply(await client.attachFile(args.task_id, basename(safePath), data));
       } catch (err) { return errorReply(err); }
     },
   );
