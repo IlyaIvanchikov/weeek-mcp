@@ -39,9 +39,22 @@ export function registerReadTools(server: McpServer, client: WeeekClient): void 
 
   server.registerTool(
     "weeek_get_task",
-    { description: "Get one WEEEK task by id.", inputSchema: { id: z.number().int() } },
+    { description: "Get one WEEEK task by id (includes its assignees).", inputSchema: { id: z.number().int() } },
     async (args) => {
       try { return jsonReply(await client.getTask(args.id)); }
+      catch (err) { return errorReply(err); }
+    },
+  );
+
+  server.registerTool(
+    "weeek_list_members",
+    {
+      description:
+        "List WEEEK workspace members (id + display name). Use to find the id for assigning a task to someone; pass that id as `assignee` to weeek_create_task.",
+      inputSchema: {},
+    },
+    async () => {
+      try { return jsonReply(await client.listMembers()); }
       catch (err) { return errorReply(err); }
     },
   );
