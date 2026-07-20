@@ -13,6 +13,11 @@ export function buildServer(config: Config): McpServer {
   const resolver = new Resolver(client, cache);
   const server = new McpServer({ name: NAME, version: VERSION });
   registerReadTools(server, client);
-  registerWriteTools(server, client, resolver);
+  registerWriteTools(server, client, resolver, {
+    // Default the attach jail to the working directory so the tool works with no
+    // configuration; WEEEK_ATTACH_DIR overrides it to point/lock it elsewhere.
+    attachDir: config.attachDir ?? process.cwd(),
+    maxBytes: config.attachMaxBytes,
+  });
   return server;
 }

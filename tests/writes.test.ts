@@ -5,14 +5,22 @@ import { registerWriteTools } from "../src/tools/writes.js";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";
 
-vi.mock("node:fs/promises", () => ({ readFile: vi.fn(async () => new Uint8Array([1, 2, 3])) }));
+// fs is mocked here so attach wiring can be exercised without touching disk;
+// the REAL path-jail exploit tests live in tests/attach.test.ts (unmocked fs).
+vi.mock("node:fs/promises", () => ({
+  readFile: vi.fn(async () => new Uint8Array([1, 2, 3])),
+  realpath: vi.fn(async (p: string) => String(p)),
+  stat: vi.fn(async () => ({ isFile: () => true, size: 3 })),
+}));
+
+const DEFAULT_ATTACH = { attachDir: "/allowed", maxBytes: 1000 };
 
 // The real MCP server parses raw tool-call args against the tool's zod schema shape
 // (via z.object(shape).parse(rawArgs)) before invoking the handler. The mocked
-// `server.tool` below replays that same parse step so these tests exercise real
-// zod behavior instead of just calling the handler with whatever raw object the
+// `server.registerTool` below replays that same parse step so these tests exercise
+// real zod behavior instead of just calling the handler with whatever raw object the
 // test passes (see tests/reads.test.ts for the same pattern).
-function harness(clientOver: Record<string, any>) {
+function harness(clientOver: Record<string, any>, attachPolicy: { attachDir: string; maxBytes: number } = DEFAULT_ATTACH) {
   const client = clientOver as any;
   const resolver = new Resolver(client, new NameCache(100000, () => 0));
   const server = new McpServer({ name: "t", version: "0" });
@@ -22,7 +30,7 @@ function harness(clientOver: Record<string, any>) {
     handlers.set(name, (rawArgs: unknown) => cb(schema.parse(rawArgs)));
     return undefined as any;
   }) as any);
-  registerWriteTools(server, client, resolver);
+  registerWriteTools(server, client, resolver, attachPolicy);
   return handlers;
 }
 
@@ -96,19 +104,36 @@ describe("write tools", () => {
     expect(updateTask.mock.calls[0][1]).not.toHaveProperty("description");
   });
 
-  it("delete_task calls deleteTask", async () => {
+  it("delete_task requires confirm:true — a bare {id} is rejected before any client call", () => {
     const deleteTask = vi.fn(async (_id: number) => ({ success: true }));
     const h = harness({ ...baseClient, deleteTask });
-    const res = await h.get("weeek_delete_task")!({ id: 42 });
+    expect(() => h.get("weeek_delete_task")!({ id: 42 })).toThrow();
+    expect(() => h.get("weeek_delete_task")!({ id: 42, confirm: false })).toThrow();
+    expect(deleteTask).not.toHaveBeenCalled();
+  });
+
+  it("delete_task deletes only when confirm:true is passed", async () => {
+    const deleteTask = vi.fn(async (_id: number) => ({ success: true }));
+    const h = harness({ ...baseClient, deleteTask });
+    const res = await h.get("weeek_delete_task")!({ id: 42, confirm: true });
     expect(deleteTask).toHaveBeenCalledWith(42);
     expect(JSON.parse(res.content[0].text)).toEqual({ success: true });
   });
 
-  it("attach_file reads the path and uploads under its basename", async () => {
-    const attachFile = vi.fn(async () => [{ id: "a1", name: "server-analysis.md", url: "http://x", size: 3 }]);
-    const h = harness({ ...baseClient, attachFile });
-    const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "/some/dir/server-analysis.md" });
-    expect(attachFile).toHaveBeenCalledWith(70, "server-analysis.md", expect.anything());
+  it("attach_file refuses a path outside the allowed dir (no client call)", async () => {
+    const attachFile = vi.fn();
+    const h = harness({ ...baseClient, attachFile }); // jailed to /allowed
+    const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "/etc/passwd" });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/outside/i);
+    expect(attachFile).not.toHaveBeenCalled();
+  });
+
+  it("attach_file uploads a file inside the allowed dir under its basename", async () => {
+    const attachFile = vi.fn(async () => [{ id: "a1", name: "ok.txt", url: "http://x", size: 3 }]);
+    const h = harness({ ...baseClient, attachFile }); // jailed to /allowed
+    const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "ok.txt" });
+    expect(attachFile).toHaveBeenCalledWith(70, "ok.txt", expect.anything());
     expect(JSON.parse(res.content[0].text)[0].id).toBe("a1");
   });
 
