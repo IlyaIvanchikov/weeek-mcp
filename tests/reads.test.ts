@@ -42,6 +42,12 @@ describe("read tools", () => {
     expect(JSON.parse(res.content[0].text)).toEqual([{ id: 1, name: "Marketing" }]);
   });
 
+  it("weeek_list_members returns the members list", async () => {
+    const h = harness({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
+    const res = await h.get("weeek_list_members")!({});
+    expect(JSON.parse(res.content[0].text)).toEqual([{ id: "u1", name: "Ilya" }]);
+  });
+
   it("weeek_list_tasks with no args applies the default perPage/offset", async () => {
     const listTasks = vi.fn(async () => []);
     const h = harness({ listTasks });
