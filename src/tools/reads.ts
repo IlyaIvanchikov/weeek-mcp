@@ -4,6 +4,11 @@ import type { WeeekClient, WeeekTask } from "../client.js";
 import { NAME, VERSION } from "../version.js";
 import { jsonReply, errorReply } from "./reply.js";
 
+// Upper bound on auto-pagination: even with the required userId + date range, a
+// wide range must not loop unbounded or build a response too large for the caller.
+// On overflow we throw rather than silently truncate, so the caller narrows the range.
+export const MAX_AUTO_PAGES = 20;
+
 export function registerReadTools(server: McpServer, client: WeeekClient): void {
   server.registerTool(
     "weeek_version",
@@ -63,13 +68,13 @@ export function registerReadTools(server: McpServer, client: WeeekClient): void 
 
         const tasks: WeeekTask[] = [];
         let offset = args.offset;
-        while (true) {
-          const page = await client.listTasks({ ...query, perPage: args.limit, offset });
-          tasks.push(...page);
-          if (page.length < args.limit) break;
+        for (let page = 0; page < MAX_AUTO_PAGES; page++) {
+          const batch = await client.listTasks({ ...query, perPage: args.limit, offset });
+          tasks.push(...batch);
+          if (batch.length < args.limit) return jsonReply(tasks);
           offset += args.limit;
         }
-        return jsonReply(tasks);
+        throw new Error(`allPages exceeded ${MAX_AUTO_PAGES} pages; narrow startDate/endDate to reduce the result set`);
       } catch (err) { return errorReply(err); }
     },
   );
