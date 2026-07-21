@@ -37,15 +37,17 @@ describe("WeeekClient", () => {
     });
   });
 
-  it("getTask surfaces assignees and boardId", async () => {
+  it("getTask surfaces assignees, boardId, and dueDate", async () => {
     const f = fakeFetch(200, { success: true, task: {
       id: 78, title: "T", description: null, projectId: 2,
-      boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"], isCompleted: false,
+      boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"],
+      dueDate: "2026-07-22", isCompleted: false,
     } });
     const c = new WeeekClient(cfg, f as unknown as typeof fetch);
     const t = await c.getTask(78);
     expect(t.assignees).toEqual(["a2318d51-uuid"]);
     expect(t.boardId).toBe(3);
+    expect(t.dueDate).toBe("2026-07-22");
   });
 
   it("getTask defaults assignees to [] when the field is absent", async () => {
