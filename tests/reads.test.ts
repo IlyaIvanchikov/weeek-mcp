@@ -62,6 +62,62 @@ describe("read tools", () => {
     expect(listTasks.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
   });
 
+  it("weeek_list_tasks forwards server-side user, status, and date filters", async () => {
+    const listTasks = vi.fn(async () => []);
+    const h = harness({ listTasks });
+    await h.get("weeek_list_tasks")!({
+      userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
+      completed: false,
+      startDate: "21.07.2026",
+      endDate: "26.07.2026",
+      limit: 50,
+    });
+    expect(listTasks.mock.calls[0][0]).toMatchObject({
+      userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
+      completed: 0,
+      startDate: "21.07.2026",
+      endDate: "26.07.2026",
+      perPage: 50,
+      offset: 0,
+    });
+  });
+
+  it("weeek_list_tasks can collect every server-filtered page inside the connector", async () => {
+    const firstPage = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
+    const secondPage = [{ id: 51 }];
+    const listTasks = vi.fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(secondPage);
+    const h = harness({ listTasks });
+    const res = await h.get("weeek_list_tasks")!({
+      userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
+      completed: false,
+      startDate: "01.01.2000",
+      endDate: "26.07.2026",
+      limit: 50,
+      allPages: true,
+    });
+    expect(JSON.parse(res.content[0].text)).toHaveLength(51);
+    expect(listTasks).toHaveBeenNthCalledWith(1, expect.objectContaining({ perPage: 50, offset: 0 }));
+    expect(listTasks).toHaveBeenNthCalledWith(2, expect.objectContaining({ perPage: 50, offset: 50 }));
+  });
+
+  it("weeek_list_tasks refuses unfiltered automatic pagination", async () => {
+    const listTasks = vi.fn(async () => []);
+    const h = harness({ listTasks });
+    const res = await h.get("weeek_list_tasks")!({ allPages: true });
+    expect(res.isError).toBe(true);
+    expect(listTasks).not.toHaveBeenCalled();
+  });
+
+  it("weeek_list_tasks requires date filters as a pair", async () => {
+    const listTasks = vi.fn(async () => []);
+    const h = harness({ listTasks });
+    const res = await h.get("weeek_list_tasks")!({ startDate: "21.07.2026" });
+    expect(res.isError).toBe(true);
+    expect(listTasks).not.toHaveBeenCalled();
+  });
+
   it("weeek_get_task returns an error reply when the client rejects", async () => {
     const h = harness({
       getTask: vi.fn(async () => {
