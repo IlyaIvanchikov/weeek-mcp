@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerReadTools } from "../src/tools/reads.js";
+import { registerReadTools, MAX_AUTO_PAGES } from "../src/tools/reads.js";
 import { errorReply } from "../src/tools/reply.js";
 
 // The real MCP server parses raw tool-call args against the tool's zod schema shape
@@ -100,6 +100,22 @@ describe("read tools", () => {
     expect(JSON.parse(res.content[0].text)).toHaveLength(51);
     expect(listTasks).toHaveBeenNthCalledWith(1, expect.objectContaining({ perPage: 50, offset: 0 }));
     expect(listTasks).toHaveBeenNthCalledWith(2, expect.objectContaining({ perPage: 50, offset: 50 }));
+  });
+
+  it("weeek_list_tasks caps auto-pagination instead of looping forever on always-full pages", async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
+    const listTasks = vi.fn(async () => fullPage); // never shorter than perPage → never self-terminates
+    const h = harness({ listTasks });
+    const res = await h.get("weeek_list_tasks")!({
+      userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
+      completed: false,
+      startDate: "01.01.2000",
+      endDate: "26.07.2026",
+      limit: 50,
+      allPages: true,
+    });
+    expect(res.isError).toBe(true);
+    expect(listTasks).toHaveBeenCalledTimes(MAX_AUTO_PAGES);
   });
 
   it("weeek_list_tasks refuses unfiltered automatic pagination", async () => {
