@@ -1,6 +1,12 @@
 # weeek-mcp-smart
 
-A WEEEK MCP server that takes **names, not IDs**. Create a task in one call:
+[![npm version](https://img.shields.io/npm/v/weeek-mcp-smart.svg)](https://www.npmjs.com/package/weeek-mcp-smart)
+[![npm downloads](https://img.shields.io/npm/dm/weeek-mcp-smart.svg)](https://www.npmjs.com/package/weeek-mcp-smart)
+[![CI](https://github.com/IlyaIvanchikov/weeek-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/IlyaIvanchikov/weeek-mcp/actions/workflows/test.yml)
+[![node](https://img.shields.io/node/v/weeek-mcp-smart.svg)](https://www.npmjs.com/package/weeek-mcp-smart)
+[![license](https://img.shields.io/npm/l/weeek-mcp-smart.svg)](./LICENSE)
+
+**The only one-click WEEEK MCP server** — it takes **names, not IDs**. Create a task in one call:
 
 ```
 weeek_create_task({ title: "Ship v1", project: "Marketing",
@@ -8,6 +14,10 @@ weeek_create_task({ title: "Ship v1", project: "Marketing",
 ```
 
 No `list_projects → list_boards → list_columns → list_members` dance first.
+
+<!-- DEMO: drop a gif/screenshot here — an agent creating a task by name in one call.
+     Your PROMOTE.md calls this the biggest single stars lever. Suggested: ![demo](docs/demo.gif) -->
+
 
 ## Install (Claude Code / Cursor)
 
