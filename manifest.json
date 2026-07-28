@@ -2,8 +2,22 @@
   "manifest_version": "0.3",
   "name": "weeek-mcp-smart",
   "version": "0.4.1",
-  "description": "WEEEK tasks by name, not IDs",
-  "author": { "name": "Ilya Ivanchikov" },
+  "description": "WEEEK tasks by name, not IDs — an MCP server",
+  "long_description": "The only one-click WEEEK MCP server. Create, update, move, and complete WEEEK tasks by passing plain names — project, column, and assignee — instead of hunting down IDs first. Natural-language due dates (\"next friday\"), a guarded file-attach tool, and a confirm-gated delete.",
+  "author": {
+    "name": "Ilya Ivanchikov",
+    "email": "ilyaivanchikov96@mail.ru",
+    "url": "https://www.linkedin.com/in/ilyaivanchikov"
+  },
+  "homepage": "https://github.com/IlyaIvanchikov/weeek-mcp#readme",
+  "documentation": "https://github.com/IlyaIvanchikov/weeek-mcp#readme",
+  "support": "https://github.com/IlyaIvanchikov/weeek-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IlyaIvanchikov/weeek-mcp.git"
+  },
+  "license": "MIT",
+  "keywords": ["mcp", "model-context-protocol", "weeek", "claude", "task-tracker", "productivity"],
   "server": {
     "type": "node",
     "entry_point": "server/index.js",
