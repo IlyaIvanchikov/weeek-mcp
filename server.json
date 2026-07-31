@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.IlyaIvanchikov/weeek-mcp-smart",
+  "title": "WEEEK (smart)",
+  "description": "WEEEK tasks by name, not IDs — an MCP server",
+  "version": "0.4.3",
+  "websiteUrl": "https://github.com/IlyaIvanchikov/weeek-mcp#readme",
+  "repository": {
+    "url": "https://github.com/IlyaIvanchikov/weeek-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "weeek-mcp-smart",
+      "version": "0.4.3",
+      "transport": { "type": "stdio" },
+      "runtimeHint": "npx",
+      "environmentVariables": [
+        {
+          "name": "WEEEK_API_TOKEN",
+          "description": "WEEEK personal API token (WEEEK → Settings → API)",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "WEEEK_API_BASE_URL",
+          "description": "Override API base for self-hosted / regional hosts (default https://api.weeek.net/public/v1)",
+          "isRequired": false
+        },
+        {
+          "name": "WEEEK_TIMEOUT_MS",
+          "description": "Per-request timeout in ms (default 30000)",
+          "isRequired": false
+        },
+        {
+          "name": "WEEEK_ATTACH_DIR",
+          "description": "Directory weeek_attach_file may read from (default: the server's working directory)",
+          "isRequired": false
+        },
+        {
+          "name": "WEEEK_ATTACH_MAX_BYTES",
+          "description": "Max attachable file size in bytes (default 10485760)",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}
