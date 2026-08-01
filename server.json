@@ -3,7 +3,7 @@
   "name": "io.github.IlyaIvanchikov/weeek-mcp-smart",
   "title": "WEEEK (smart)",
   "description": "WEEEK tasks by name, not IDs — an MCP server",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "websiteUrl": "https://github.com/IlyaIvanchikov/weeek-mcp#readme",
   "repository": {
     "url": "https://github.com/IlyaIvanchikov/weeek-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "weeek-mcp-smart",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "transport": { "type": "stdio" },
       "runtimeHint": "npx",
       "environmentVariables": [

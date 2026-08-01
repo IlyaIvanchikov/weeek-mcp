@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "weeek-mcp-smart",
-  "version": "0.4.2",
+  "version": "0.4.4",
   "description": "WEEEK tasks by name, not IDs — an MCP server",
   "long_description": "The only one-click WEEEK MCP server. Create, update, move, and complete WEEEK tasks by passing plain names — project, column, and assignee — instead of hunting down IDs first. Natural-language due dates (\"next friday\"), a guarded file-attach tool, and a confirm-gated delete.",
   "author": {

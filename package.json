@@ -1,6 +1,6 @@
 {
   "name": "weeek-mcp-smart",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "mcpName": "io.github.IlyaIvanchikov/weeek-mcp-smart",
   "description": "WEEEK tasks by name, not IDs — an MCP server",
   "keywords": [
