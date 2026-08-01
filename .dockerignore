@@ -1,0 +1,8 @@
+node_modules
+dist
+server
+*.mcpb
+.git
+.github
+tests
+docs
