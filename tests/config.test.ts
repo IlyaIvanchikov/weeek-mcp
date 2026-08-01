@@ -8,8 +8,10 @@ describe("loadConfig", () => {
     expect(c.baseUrl).toBe("https://api.weeek.net/public/v1");
     expect(c.timeoutMs).toBe(30000);
   });
-  it("throws when the token is missing", () => {
-    expect(() => loadConfig({})).toThrow(/WEEEK_API_TOKEN/);
+  it("allows a missing token so tools can be listed without credentials", () => {
+    const c = loadConfig({});
+    expect(c.token).toBeUndefined();
+    expect(c.baseUrl).toBe("https://api.weeek.net/public/v1");
   });
   it("throws when the token is too short", () => {
     expect(() => loadConfig({ WEEEK_API_TOKEN: "short" })).toThrow(/WEEEK_API_TOKEN/);

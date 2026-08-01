@@ -9,6 +9,13 @@ function fakeFetch(status: number, body: unknown) {
 const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000 };
 
 describe("WeeekClient", () => {
+  it("throws a clear error when no token is set, without calling fetch", async () => {
+    const f = fakeFetch(200, {});
+    const c = new WeeekClient({ ...cfg, token: undefined }, f as unknown as typeof fetch);
+    await expect(c.listProjects()).rejects.toThrow(/WEEEK_API_TOKEN/);
+    expect(f).not.toHaveBeenCalled();
+  });
+
   it("listProjects normalises to {id,name}", async () => {
     const f = fakeFetch(200, { success: true, projects: [{ id: 1, name: "Marketing" }] });
     const c = new WeeekClient(cfg, f as unknown as typeof fetch);

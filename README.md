@@ -40,7 +40,7 @@ WEEEK → Settings → API → generate a personal token.
 
 | Env var | Required | Default | Purpose |
 |---|---|---|---|
-| `WEEEK_API_TOKEN` | yes | — | Your WEEEK personal API token. |
+| `WEEEK_API_TOKEN` | to call tools | — | Your WEEEK personal API token. The server starts and lists its tools without it, but any tool call fails until it is set. |
 | `WEEEK_API_BASE_URL` | no | `https://api.weeek.net/public/v1` | Override for self-hosted / regional hosts. |
 | `WEEEK_TIMEOUT_MS` | no | `30000` | Per-request timeout. |
 | `WEEEK_ATTACH_DIR` | no | the server's working directory | Directory `weeek_attach_file` may read from (see Safety). |

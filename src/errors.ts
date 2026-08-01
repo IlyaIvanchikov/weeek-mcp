@@ -5,6 +5,15 @@ export class WeeekApiError extends Error {
   }
 }
 
+export class WeeekAuthError extends Error {
+  constructor(
+    message = "WEEEK_API_TOKEN is not set. Add your WEEEK personal token (WEEEK → Settings → API) to call WEEEK tools.",
+  ) {
+    super(message);
+    this.name = "WeeekAuthError";
+  }
+}
+
 export class WeeekTimeoutError extends Error {
   constructor(message = "WEEEK request timed out") {
     super(message);

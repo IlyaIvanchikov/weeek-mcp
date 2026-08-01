@@ -1,5 +1,5 @@
 import type { Config } from "./config.js";
-import { WeeekApiError, WeeekTimeoutError } from "./errors.js";
+import { WeeekApiError, WeeekAuthError, WeeekTimeoutError } from "./errors.js";
 
 export interface NamedEntity { id: number; name: string; }
 export interface Member { id: string; name: string; }
@@ -20,6 +20,9 @@ export class WeeekClient {
   constructor(private cfg: Config, private fetchImpl: typeof fetch = fetch) {}
 
   private async request<T>(method: string, path: string, opts: { query?: Query; body?: unknown } = {}): Promise<T> {
+    // Tools are listed without a token; the token is required only once a tool
+    // actually calls the API. Fail clearly here instead of sending an unauthed request.
+    if (!this.cfg.token) throw new WeeekAuthError();
     const url = new URL(this.cfg.baseUrl + path);
     for (const [k, v] of Object.entries(opts.query ?? {})) {
       if (v !== undefined) url.searchParams.set(k, String(v));

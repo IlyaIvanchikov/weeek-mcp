@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 const schema = z.object({
-  WEEEK_API_TOKEN: z.string().min(20, "WEEEK_API_TOKEN must be at least 20 chars"),
+  // Optional at boot so the server can start and list its tools without credentials
+  // (registries introspect it this way); a token is required only to call a tool.
+  // When provided it must still look real, so the length check stays.
+  WEEEK_API_TOKEN: z.string().min(20, "WEEEK_API_TOKEN must be at least 20 chars").optional(),
   WEEEK_API_BASE_URL: z.string().url().default("https://api.weeek.net/public/v1"),
   WEEEK_TIMEOUT_MS: z.coerce.number().int().positive().max(600000).default(30000),
   // Attaching files is opt-in and jailed to this directory (see src/attach.ts).
@@ -11,7 +14,7 @@ const schema = z.object({
 });
 
 export interface Config {
-  token: string;
+  token?: string;
   baseUrl: string;
   timeoutMs: number;
   attachDir?: string;
