@@ -2,14 +2,25 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WeeekClient, WeeekTask } from "../client.js";
 import { NAME, VERSION } from "../version.js";
-import { jsonReply, errorReply } from "./reply.js";
+import { jsonReply, imageReply, errorReply } from "./reply.js";
 
 // Upper bound on auto-pagination: even with the required userId + date range, a
 // wide range must not loop unbounded or build a response too large for the caller.
 // On overflow we throw rather than silently truncate, so the caller narrows the range.
 export const MAX_AUTO_PAGES = 20;
 
-export function registerReadTools(server: McpServer, client: WeeekClient): void {
+// An attachment id goes straight into the request path, and it reaches this tool from
+// untrusted task text via the model. Restricting it to id characters keeps the path
+// from being steered elsewhere; the API declares file_id as a plain string, so this
+// deliberately does not demand a uuid it never promised.
+const ATTACHMENT_ID = /^[A-Za-z0-9_-]+$/;
+
+export interface AttachmentReadPolicy {
+  /** Largest attachment body to pull into the reply. */
+  maxBytes: number;
+}
+
+export function registerReadTools(server: McpServer, client: WeeekClient, policy: AttachmentReadPolicy): void {
   server.registerTool(
     "weeek_version",
     { description: "Return this MCP server's name and version, so callers can check which build is running.", inputSchema: {} },
@@ -85,6 +96,39 @@ export function registerReadTools(server: McpServer, client: WeeekClient): void 
     async (args) => {
       try { return jsonReply(await client.getTask(args.id)); }
       catch (err) { return errorReply(err); }
+    },
+  );
+
+  server.registerTool(
+    "weeek_get_attachment",
+    {
+      description:
+        "Read one WEEEK attachment by id. For an image WEEEK hosts itself this returns the image, so a task whose requirements live in a screenshot can actually be read instead of guessed at from the surrounding text; anything else comes back as metadata. Ids come from a task's `attachments` list (weeek_get_task).",
+      inputSchema: {
+        id: z.string().regex(ATTACHMENT_ID, "attachment id must be an id, not a path"),
+        metadataOnly: z.boolean().default(false),
+      },
+    },
+    async (args) => {
+      try {
+        const attachment = await client.getAttachment(args.id);
+        if (args.metadataOnly) return jsonReply({ attachment });
+        if (attachment.service !== "weeek") {
+          return jsonReply({
+            attachment,
+            note: `stored in ${attachment.service}, not in WEEEK; open its url directly — only weeek-hosted attachments can be read through this tool`,
+          });
+        }
+        const { bytes, contentType } = await client.downloadAttachment({
+          attachment,
+          maxBytes: policy.maxBytes,
+        });
+        // Never dump a binary into the conversation: only an image earns its bytes.
+        if (!contentType.startsWith("image/")) {
+          return jsonReply({ attachment, note: `not an image (${contentType}); its bytes are not returned` });
+        }
+        return imageReply(bytes, contentType);
+      } catch (err) { return errorReply(err); }
     },
   );
 

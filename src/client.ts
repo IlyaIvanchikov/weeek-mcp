@@ -7,12 +7,32 @@ export interface WeeekTask {
   id: number; title: string; description: string | null;
   projectId: number | null; boardId: number | null; boardColumnId: number | null;
   assignees: string[]; dueDate: string | null; completed: boolean;
+  attachments: Attachment[];
 }
 export interface CreateTaskBody {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
 }
-export interface Attachment { id: string; name: string; url: string; size: number; }
+// WEEEK stores an attachment either itself ("weeek") or in a third-party drive.
+// The vocabulary is closed, so it is a closed type: a new service must fail the
+// type check at every branch that reads it rather than fall through silently.
+export const attachmentServices = ["weeek", "google_drive", "dropbox", "one_drive", "box"] as const;
+export type AttachmentService = (typeof attachmentServices)[number];
+
+export interface Attachment {
+  id: string;
+  creatorId: string;
+  service: AttachmentService;
+  name: string;
+  /** Temporary URL. When `service` is "weeek" it is valid for one hour. */
+  url: string;
+  /** Present only when `service` is "weeek". */
+  size?: number;
+  createdAt: string;
+}
+
+export interface AttachmentBytes { bytes: Uint8Array; contentType: string; }
+export interface DownloadAttachmentOptions { attachment: Attachment; maxBytes: number; }
 
 type Query = Record<string, string | number | boolean | undefined>;
 
@@ -90,6 +110,9 @@ export class WeeekClient {
       assignees: Array.isArray(raw.assignees) ? raw.assignees.map(String) : [],
       dueDate: raw.dueDate == null ? null : String(raw.dueDate),
       completed: Boolean(raw.isCompleted ?? raw.completed ?? false),
+      // The API returns these with every task; surfacing them is what lets a caller
+      // see a screenshot-only description instead of silently working from the prose.
+      attachments: Array.isArray(raw.attachments) ? (raw.attachments as Attachment[]) : [],
     };
   }
 
@@ -139,8 +162,96 @@ export class WeeekClient {
     const blob = data instanceof Blob ? data : new Blob([data as BlobPart]);
     form.append("files[]", blob, filename);
     const j = await this.request<{ data?: unknown }>("POST", `/tm/tasks/${id}/attachments`, { body: form });
-    return (Array.isArray(j.data) ? j.data : []) as Attachment[];
+    // The spec documents `data` as one Attachment object; accept a list too, since
+    // `files[]` is a multipart array and the live response has not been pinned down.
+    if (Array.isArray(j.data)) return j.data as Attachment[];
+    return j.data ? [j.data as Attachment] : [];
   }
+  async getAttachment(id: string): Promise<Attachment> {
+    const j = await this.request<{ data?: unknown }>("GET", `/ws/attachments/${id}`);
+    return j.data as Attachment;
+  }
+
+  /**
+   * Fetch an attachment's bytes from the URL its metadata carries.
+   *
+   * The URL is pre-signed (`expires` + `signature`), so no token is sent — not to WEEEK and
+   * not to the storage host WEEEK redirects to (an S3 bucket, with its own one-hour signed
+   * link). Security rules, in order:
+   *   1. only "weeek"-hosted attachments are downloaded at all; a third-party `service`
+   *      points at that vendor's host and comes back as metadata only;
+   *   2. the first hop must sit on the configured API origin;
+   *   3. the redirect is followed by hand, exactly once, and only to https — so where the
+   *      bytes come from is decided here, not by fetch's redirect policy;
+   *   4. the size is capped before the request when declared, and again on the body,
+   *      refusing loudly instead of truncating.
+   */
+  async downloadAttachment({ attachment, maxBytes }: DownloadAttachmentOptions): Promise<AttachmentBytes> {
+    if (attachment.service !== "weeek") {
+      throw new Error(
+        `attachment ${attachment.id} is stored in ${attachment.service}; only weeek-hosted attachments can be downloaded`,
+      );
+    }
+    const apiOrigin = new URL(this.cfg.baseUrl).origin;
+    let url: URL;
+    try {
+      url = new URL(attachment.url);
+    } catch {
+      throw new Error(`attachment ${attachment.id} has an unusable url`);
+    }
+    if (url.origin !== apiOrigin) {
+      throw new Error(`attachment ${attachment.id} url origin ${url.origin} is not the WEEEK API origin ${apiOrigin}`);
+    }
+    if (attachment.size !== undefined && attachment.size > maxBytes) {
+      throw new Error(`attachment ${attachment.id} is too large (${attachment.size} > ${maxBytes} bytes)`);
+    }
+
+    let res = await this.fetchUnauthenticated(url, attachment.id);
+    if (WeeekClient.isRedirect(res.status)) {
+      const location = res.headers.get("location");
+      if (!location) throw new Error(`attachment ${attachment.id}: WEEEK redirected without a location`);
+      const target = new URL(location, url);
+      if (target.protocol !== "https:") {
+        throw new Error(`attachment ${attachment.id}: refusing a redirect to non-https ${target.origin}`);
+      }
+      res = await this.fetchUnauthenticated(target, attachment.id);
+      if (WeeekClient.isRedirect(res.status)) {
+        throw new Error(`attachment ${attachment.id}: the storage host answered with another redirect; only one is followed`);
+      }
+    }
+    if (!res.ok) {
+      throw new WeeekApiError(`could not download attachment ${attachment.id}`, res.status, `http_${res.status}`);
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength > maxBytes) {
+      throw new Error(`attachment ${attachment.id} is too large (${bytes.byteLength} > ${maxBytes} bytes)`);
+    }
+    return { bytes, contentType: res.headers.get("content-type") ?? "application/octet-stream" };
+  }
+
+  private static isRedirect(status: number): boolean {
+    return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+  }
+
+  // A GET with no credentials and no automatic redirect. A transport failure is reported
+  // with the host and undici's cause code: "fetch failed" alone has cost real debugging time
+  // when a VPN routed the storage host into a black hole.
+  private async fetchUnauthenticated(url: URL, attachmentId: string): Promise<Response> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
+    try {
+      return await this.fetchImpl(url, { method: "GET", redirect: "manual", signal: ctrl.signal });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") throw new WeeekTimeoutError();
+      const cause = (err as { cause?: { code?: string } }).cause?.code ?? (err instanceof Error ? err.message : String(err));
+      throw new Error(
+        `could not reach ${url.host} (${cause}) while downloading attachment ${attachmentId}; if you are on a VPN, the storage host may be routed through it`,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async moveTask(id: number, boardId: number, boardColumnId: number): Promise<WeeekTask> {
     await this.request("POST", `/tm/tasks/${id}/board`, { body: { boardId } });
     await this.request("POST", `/tm/tasks/${id}/board-column`, { body: { boardColumnId } });

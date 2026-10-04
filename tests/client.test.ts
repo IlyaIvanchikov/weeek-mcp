@@ -6,6 +6,16 @@ function fakeFetch(status: number, body: unknown) {
     status, headers: { "content-type": "application/json" },
   }));
 }
+function fakeBinaryFetch(status: number, bytes: Uint8Array, contentType: string) {
+  return vi.fn(async () => new Response(bytes as unknown as BodyInit, {
+    status, headers: { "content-type": contentType },
+  }));
+}
+function redirectThenBinaryFetch(location: string, bytes: Uint8Array, contentType: string, secondStatus = 200) {
+  return vi.fn()
+    .mockImplementationOnce(async () => new Response(null, { status: 303, headers: { location } }))
+    .mockImplementationOnce(async () => new Response(bytes as unknown as BodyInit, { status: secondStatus, headers: { "content-type": contentType } }));
+}
 const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000 };
 
 describe("WeeekClient", () => {
@@ -130,5 +140,159 @@ describe("WeeekClient", () => {
     expect(String(columnUrl)).toBe("https://api.weeek.net/public/v1/tm/tasks/7/board-column");
     expect((columnInit as RequestInit).method).toBe("POST");
     expect(JSON.parse((columnInit as RequestInit).body as string)).toEqual({ boardColumnId: 4 });
+  });
+  it("getAttachment GETs /ws/attachments/{id} and returns the metadata from the data envelope", async () => {
+    const att = {
+      id: "a285d36a-8019-41e9-9e58-ad29213bce35",
+      creatorId: "a2318d51-46cd-42a9-bab4-554c80824574",
+      service: "weeek",
+      name: "modules.png",
+      url: "https://api.weeek.net/ws/1005494/files/a285d36a-8019-41e9-9e58-ad29213bce35?sig=x",
+      size: 4096,
+      createdAt: "2026-08-01T10:00:00Z",
+    };
+    const f = fakeFetch(200, { success: true, data: att });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    expect(await c.getAttachment(att.id)).toEqual(att);
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe(`https://api.weeek.net/public/v1/ws/attachments/${att.id}`);
+    expect((init as RequestInit).method).toBe("GET");
+  });
+
+  it("getTask surfaces the attachments the API already returns", async () => {
+    const att = {
+      id: "a285d36a-8019-41e9-9e58-ad29213bce35", creatorId: "u1", service: "weeek",
+      name: "modules.png", url: "https://api.weeek.net/f/1", size: 10, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const f = fakeFetch(200, { success: true, task: { id: 131, title: "T", attachments: [att] } });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    expect((await c.getTask(131)).attachments).toEqual([att]);
+  });
+
+  it("getTask defaults attachments to [] when the field is absent", async () => {
+    const f = fakeFetch(200, { success: true, task: { id: 1, title: "T" } });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    expect((await c.getTask(1)).attachments).toEqual([]);
+  });
+
+  it("attachFile accepts the documented single-object data shape", async () => {
+    const att = { id: "a1", creatorId: "u1", service: "weeek", name: "f.md", url: "http://x", size: 3, createdAt: "2026-08-01T10:00:00Z" };
+    const f = fakeFetch(200, { success: true, data: att });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    expect(await c.attachFile(7, "f.md", new Uint8Array([1, 2, 3]))).toEqual([att]);
+  });
+
+  it("downloadAttachment fetches the attachment url and returns its bytes and content-type", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const f = fakeBinaryFetch(200, png, "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "modules.png",
+      url: "https://api.weeek.net/ws/1005494/files/a1?sig=x", size: png.length,
+      createdAt: "2026-08-01T10:00:00Z",
+    };
+    const out = await c.downloadAttachment({ attachment, maxBytes: 1024 });
+    expect(out.contentType).toBe("image/png");
+    expect(Array.from(out.bytes)).toEqual(Array.from(png));
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe(attachment.url);
+    // The url is pre-signed (expires + signature), so the token is never part of a download.
+    expect((init as RequestInit).headers ?? {}).not.toHaveProperty("Authorization");
+    expect((init as RequestInit).redirect).toBe("manual");
+  });
+
+  it("downloadAttachment follows one redirect from the API origin to the storage host, without the token", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const storage = "https://prod-private.s3.ru-1.storage.selcloud.ru/1005494/a1?X-Amz-Signature=s";
+    const f = redirectThenBinaryFetch(storage, png, "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "modules.png",
+      url: "https://api.weeek.net/ws/1005494/files/a1?expires=1&signature=x", size: png.length,
+      createdAt: "2026-08-01T10:00:00Z",
+    };
+    const out = await c.downloadAttachment({ attachment, maxBytes: 1024 });
+    expect(Array.from(out.bytes)).toEqual(Array.from(png));
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(String(f.mock.calls[1][0])).toBe(storage);
+    expect((f.mock.calls[1][1] as RequestInit).headers ?? {}).not.toHaveProperty("Authorization");
+  });
+
+  it("downloadAttachment refuses a redirect to a non-https location", async () => {
+    const f = redirectThenBinaryFetch("http://prod-private.s3.ru-1.storage.selcloud.ru/1005494/a1", new Uint8Array([1]), "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "x.png",
+      url: "https://api.weeek.net/ws/1005494/files/a1?expires=1&signature=x", size: 1, createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/https/);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("downloadAttachment refuses a second redirect", async () => {
+    const f = redirectThenBinaryFetch("https://storage.example/one", new Uint8Array([1]), "image/png", 302);
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "x.png",
+      url: "https://api.weeek.net/ws/1005494/files/a1?expires=1&signature=x", size: 1, createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/redirect/);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("downloadAttachment names the unreachable host and the cause when the transport fails", async () => {
+    const f = vi.fn()
+      .mockImplementationOnce(async () => new Response(null, { status: 303, headers: { location: "https://prod-private.s3.ru-1.storage.selcloud.ru/1005494/a1?X-Amz-Signature=s" } }))
+      .mockImplementationOnce(async () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_CONNECT_TIMEOUT" } }); });
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "x.png",
+      url: "https://api.weeek.net/ws/1005494/files/a1?expires=1&signature=x", size: 1, createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/prod-private\.s3\.ru-1\.storage\.selcloud\.ru.*UND_ERR_CONNECT_TIMEOUT.*VPN/s);
+  });
+
+  it("downloadAttachment refuses an attachment stored in an external service", async () => {
+    const f = fakeBinaryFetch(200, new Uint8Array([1]), "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "google_drive" as const, name: "x.png",
+      url: "https://drive.google.com/file/a1", createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/google_drive/);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("downloadAttachment refuses a url outside the API origin", async () => {
+    const f = fakeBinaryFetch(200, new Uint8Array([1]), "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "x.png",
+      url: "https://evil.example.com/steal", size: 1, createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/origin/);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("downloadAttachment refuses a declared size over maxBytes without fetching", async () => {
+    const f = fakeBinaryFetch(200, new Uint8Array([1]), "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "big.png",
+      url: "https://api.weeek.net/f/a1", size: 5000, createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/too large/);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("downloadAttachment refuses a body over maxBytes even when size was absent", async () => {
+    const f = fakeBinaryFetch(200, new Uint8Array(2048), "image/png");
+    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek" as const, name: "big.png",
+      url: "https://api.weeek.net/f/a1", createdAt: "2026-08-01T10:00:00Z",
+    };
+    await expect(c.downloadAttachment({ attachment, maxBytes: 1024 })).rejects.toThrow(/too large/);
+    expect(f).toHaveBeenCalled();
   });
 });
