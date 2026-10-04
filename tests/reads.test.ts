@@ -10,7 +10,7 @@ import { errorReply } from "../src/tools/reply.js";
 // `.default(...)` fields get their default applied. The mocked `server.tool` below
 // replays that same parse step so these tests exercise real zod default-application
 // behavior instead of just calling the handler with whatever raw object the test passes.
-function harness(clientOver: Record<string, any>) {
+function harness(clientOver: Record<string, any>, maxBytes = 1024) {
   const server = new McpServer({ name: "t", version: "0" });
   const handlers = new Map<string, Function>();
   vi.spyOn(server, "registerTool").mockImplementation(((name: string, config: any, cb: Function) => {
@@ -18,7 +18,7 @@ function harness(clientOver: Record<string, any>) {
     handlers.set(name, (rawArgs: unknown) => cb(schema.parse(rawArgs)));
     return undefined as any;
   }) as any);
-  registerReadTools(server, clientOver as any);
+  registerReadTools(server, clientOver as any, { maxBytes });
   return handlers;
 }
 
@@ -153,5 +153,86 @@ describe("read tools", () => {
     });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).candidates).toEqual([{ id: 1, name: "A" }]);
+  });
+  it("weeek_get_attachment returns an image block for a weeek-hosted image", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const attachment = {
+      id: "a1", creatorId: "u1", service: "weeek", name: "modules.png",
+      url: "https://api.weeek.net/f/a1", size: png.length, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const h = harness({
+      getAttachment: async () => attachment,
+      downloadAttachment: async () => ({ bytes: png, contentType: "image/png" }),
+    });
+    const res = await h.get("weeek_get_attachment")!({ id: "a1" });
+    expect(res.content[0]).toEqual({
+      type: "image",
+      data: Buffer.from(png).toString("base64"),
+      mimeType: "image/png",
+    });
+  });
+
+  it("weeek_get_attachment returns metadata only for a non-image attachment", async () => {
+    const attachment = {
+      id: "a2", creatorId: "u1", service: "weeek", name: "spec.pdf",
+      url: "https://api.weeek.net/f/a2", size: 12, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const download = vi.fn(async () => ({ bytes: new Uint8Array([1, 2]), contentType: "application/pdf" }));
+    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const res = await h.get("weeek_get_attachment")!({ id: "a2" });
+    const body = JSON.parse(res.content[0].text);
+    expect(body.attachment).toEqual(attachment);
+    expect(body.note).toMatch(/not an image/i);
+  });
+
+  it("weeek_get_attachment does not download an externally stored attachment", async () => {
+    const attachment = {
+      id: "a3", creatorId: "u1", service: "google_drive", name: "x.png",
+      url: "https://drive.google.com/file/a3", createdAt: "2026-08-01T10:00:00Z",
+    };
+    const download = vi.fn();
+    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const res = await h.get("weeek_get_attachment")!({ id: "a3" });
+    const body = JSON.parse(res.content[0].text);
+    expect(body.attachment).toEqual(attachment);
+    expect(body.note).toMatch(/google_drive/);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("weeek_get_attachment skips the download when metadataOnly is set", async () => {
+    const attachment = {
+      id: "a4", creatorId: "u1", service: "weeek", name: "modules.png",
+      url: "https://api.weeek.net/f/a4", size: 4, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const download = vi.fn();
+    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const res = await h.get("weeek_get_attachment")!({ id: "a4", metadataOnly: true });
+    expect(JSON.parse(res.content[0].text).attachment).toEqual(attachment);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("weeek_get_attachment passes the configured cap to the download", async () => {
+    const attachment = {
+      id: "a5", creatorId: "u1", service: "weeek", name: "modules.png",
+      url: "https://api.weeek.net/f/a5", size: 4, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const download = vi.fn(async () => ({ bytes: new Uint8Array([1]), contentType: "image/png" }));
+    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download }, 4096);
+    await h.get("weeek_get_attachment")!({ id: "a5" });
+    expect(download).toHaveBeenCalledWith({ attachment, maxBytes: 4096 });
+  });
+
+  it("weeek_get_attachment surfaces a download refusal as an error reply", async () => {
+    const attachment = {
+      id: "a6", creatorId: "u1", service: "weeek", name: "big.png",
+      url: "https://api.weeek.net/f/a6", size: 99999, createdAt: "2026-08-01T10:00:00Z",
+    };
+    const h = harness({
+      getAttachment: async () => attachment,
+      downloadAttachment: async () => { throw new Error("attachment a6 is too large (99999 > 1024 bytes)"); },
+    });
+    const res = await h.get("weeek_get_attachment")!({ id: "a6" });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/too large/);
   });
 });
