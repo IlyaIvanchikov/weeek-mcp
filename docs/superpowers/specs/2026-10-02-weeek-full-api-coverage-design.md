@@ -95,7 +95,7 @@ src/client.ts                  WeeekClient = { tasks, projects, boards, columns,
                                crm: { funnels, statuses, deals, organizations, contacts, currencies } }
 src/resolver.ts                Resolver — one generic resolve + the kinds table
 src/cache.ts                   NameCache (unchanged)
-src/toolsets.ts                closed set of toolset names → register function; the default
+src/toolsets/{constants,types,register}.ts   closed set of toolset names (leaf), ToolContext, register function; the default
 src/tools/core.ts              weeek_version — always registered
 src/tools/tasks.ts             the `tasks` toolset (today's reads.ts + writes.ts fold in here)
 src/tools/projects.ts          the `projects` toolset
