@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toolsetNames, defaultToolsets, type ToolsetName } from "./toolsets.js";
 
 const schema = z.object({
   // Optional at boot so the server can start and list its tools without credentials
@@ -11,6 +12,8 @@ const schema = z.object({
   // Unset => weeek_attach_file is disabled.
   WEEEK_ATTACH_DIR: z.string().min(1).optional(),
   WEEEK_ATTACH_MAX_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(10_485_760),
+  // Comma-separated toolset names, or "all". Unset or blank means the default.
+  WEEEK_TOOLSETS: z.string().optional(),
 });
 
 export interface Config {
@@ -19,6 +22,18 @@ export interface Config {
   timeoutMs: number;
   attachDir?: string;
   attachMaxBytes: number;
+  toolsets: readonly ToolsetName[];
+}
+
+export function parseToolsets(raw: string | undefined): ToolsetName[] {
+  const names = (raw ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0);
+  if (names.length === 0) return [...defaultToolsets];
+  const known: readonly string[] = toolsetNames;
+  const unknown = names.find((n) => !known.includes(n));
+  if (unknown !== undefined) {
+    throw new Error(`invalid config: WEEEK_TOOLSETS: unknown toolset "${unknown}"; valid values: ${toolsetNames.join(", ")}`);
+  }
+  return [...new Set(names)] as ToolsetName[];
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -33,5 +48,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timeoutMs: parsed.data.WEEEK_TIMEOUT_MS,
     attachDir: parsed.data.WEEEK_ATTACH_DIR,
     attachMaxBytes: parsed.data.WEEEK_ATTACH_MAX_BYTES,
+    toolsets: parseToolsets(parsed.data.WEEEK_TOOLSETS),
   };
 }
