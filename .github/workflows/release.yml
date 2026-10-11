@@ -42,7 +42,36 @@ jobs:
           fi
 
       # No token: OIDC trusted publishing. Provenance is generated automatically.
-      - run: npm publish
+      # Skipped when npm already serves this version, so a re-run of a half-finished
+      # release (tag re-pushed after a fix) does not die on "cannot publish over".
+      - name: Publish to npm (unless this version is already there)
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="${GITHUB_REF_NAME#v}"
+          if curl -fsS -o /dev/null "https://registry.npmjs.org/$NAME/$VERSION"; then
+            echo "$NAME@$VERSION is already on npm — skipping publish"
+          else
+            npm publish
+          fi
+
+      # npm propagates a new version to its read API minutes after `npm publish` returns,
+      # and the MCP registry refuses to list a version npm does not serve yet (it GETs
+      # registry.npmjs.org/<name>/<version>). Without this wait the next step fails every
+      # time with "version '<v>' was not found (status: 404)" — that is what happened on 0.4.5.
+      - name: Wait for npm to serve the new version
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 40); do
+            if curl -fsS -o /dev/null "https://registry.npmjs.org/$NAME/$VERSION"; then
+              echo "npm serves $NAME@$VERSION after $attempt attempt(s)"
+              exit 0
+            fi
+            echo "attempt $attempt: $NAME@$VERSION not on npm yet, waiting 15s"
+            sleep 15
+          done
+          echo "::error::$NAME@$VERSION still not served by npm after 10 minutes — check https://status.npmjs.org and re-run this job"
+          exit 1
 
       # Publish to the official MCP registry using the same OIDC identity — no extra secret.
       - name: Install mcp-publisher
