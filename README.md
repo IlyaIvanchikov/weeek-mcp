@@ -43,6 +43,7 @@ WEEEK → Settings → API → generate a personal token.
 | `WEEEK_API_TOKEN` | to call tools | — | Your WEEEK personal API token. The server starts and lists its tools without it, but any tool call fails until it is set. |
 | `WEEEK_API_BASE_URL` | no | `https://api.weeek.net/public/v1` | Override for self-hosted / regional hosts. |
 | `WEEEK_TIMEOUT_MS` | no | `30000` | Per-request timeout. |
+| `WEEEK_TOOLSETS` | no | `tasks` | Comma-separated groups of tools to expose, or `all`. See Toolsets. |
 | `WEEEK_ATTACH_DIR` | no | the server's working directory | Directory `weeek_attach_file` may read from (see Safety). |
 | `WEEEK_ATTACH_MAX_BYTES` | no | `10485760` (10 MB) | Max attachable file size. |
 
@@ -54,10 +55,40 @@ This server is driven by an LLM that can read untrusted content (task text, web 
 - **`weeek_delete_task`** is permanent and requires an explicit `confirm: true`; to merely close a task use `weeek_complete_task`.
 - **`weeek_get_attachment`** returns the image for an attachment WEEEK hosts itself, so a task specified in screenshots can be read rather than guessed at. It downloads bytes only when the attachment's `service` is `weeek`; an attachment parked in Google Drive/Dropbox/OneDrive/Box comes back as metadata with its URL instead. The download sends **no token at all**: WEEEK hands out a pre-signed one-hour URL that redirects to its storage bucket, and the server follows exactly one redirect, only to `https`, with no credentials on either hop. Non-images return metadata only, and anything over `WEEEK_ATTACH_MAX_BYTES` is refused rather than truncated.
 
-## Tools
+## Toolsets
 
-Reads: `weeek_version`, `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`, `weeek_list_members`, `weeek_get_attachment`.
-Writes: `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`, `weeek_attach_file`, `weeek_delete_task`.
+Every tool's schema is sent to the model on every request, so the server exposes a small
+default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated list, or `all`.
+
+| Toolset | Tools | Default |
+|---|---|---|
+| `tasks` | `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`, `weeek_list_members`, `weeek_get_attachment`, `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`, `weeek_attach_file`, `weeek_delete_task` | **yes** |
+| `all` | every toolset | |
+
+`weeek_version` is always available. More toolsets (`projects`, `custom-fields`, `crm`) arrive in
+the next releases; an unknown name is rejected at startup with the list of valid ones.
+
+```bash
+WEEEK_TOOLSETS=all npx -y weeek-mcp-smart
+```
+
+## Development
+
+### Updating the API spec snapshot
+
+`spec/weeek-openapi.json` is a snapshot of WEEEK's public OpenAPI document. A test
+(`tests/contract.test.ts`) checks that every operation the server calls exists in it and that
+every operation it declares is either implemented or explicitly deferred — so an API change
+shows up as a failing test, not as a surprise in production.
+
+```bash
+npm run refresh-spec            # re-extract from developers.weeek.net
+npx vitest run tests/contract.test.ts
+```
+
+If the refresh fails with a DNS or connection error, read the comment at the top of
+`scripts/refresh-spec.mjs` — it lists the known causes (VPN resolver, blocked tunnel) and the
+exact fix for each.
 
 ## Author
 
