@@ -35,6 +35,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "refresh-spec": "node scripts/refresh-spec.mjs",
     "pack:mcpb": "bash scripts/pack-mcpb.sh",
     "prepublishOnly": "npm run build"
   },
