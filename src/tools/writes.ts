@@ -17,10 +17,10 @@ interface CreateInput {
 }
 
 export async function buildCreateBody(resolver: Resolver, input: CreateInput): Promise<CreateTaskBody> {
-  const projectId = await resolver.resolveProject(input.project);
+  const projectId = await resolver.resolve({ kind: "project", value: input.project });
   const body: CreateTaskBody = { title: input.title, projectId };
-  if (input.column !== undefined) body.boardColumnId = await resolver.resolveColumn(projectId, input.column);
-  if (input.assignee !== undefined) body.userId = await resolver.resolveAssignee(input.assignee);
+  if (input.column !== undefined) body.boardColumnId = await resolver.resolve({ kind: "column", value: input.column, scope: { projectId } });
+  if (input.assignee !== undefined) body.userId = await resolver.resolve({ kind: "member", value: input.assignee });
   if (input.due !== undefined) body.dayFrom = parseDueDate(input.due);
   if (input.description !== undefined) body.description = input.description;
   return body;
@@ -133,7 +133,7 @@ export function registerWriteTools(
     { description: "Move a WEEEK task to a column (by name or id, scoped to the given board) on that board.", inputSchema: { id: z.number().int(), board_id: z.number().int(), column: nameOrId } },
     async (args) => {
       try {
-        const columnId = await resolver.resolveColumnInBoard(args.board_id, args.column);
+        const columnId = await resolver.resolve({ kind: "column", value: args.column, scope: { boardId: args.board_id } });
         return jsonReply(await client.tasks.move({ id: args.id, boardId: args.board_id, boardColumnId: columnId }));
       } catch (err) { return errorReply(err); }
     },
