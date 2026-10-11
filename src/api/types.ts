@@ -29,7 +29,7 @@ export interface WeeekTask {
   attachments: Attachment[];
 }
 
-export interface CreateTaskBody {
+export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
 }

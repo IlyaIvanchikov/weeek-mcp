@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolContext } from "../toolsets/types.js";
-import type { CreateTaskBody, WeeekTask } from "../client.js";
+import type { NewTask, WeeekTask } from "../client.js";
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
 import { parseDueDate } from "../dates.js";
@@ -27,14 +27,14 @@ interface CreateInput {
   due?: string; description?: string;
 }
 
-export async function buildCreateBody(resolver: Resolver, input: CreateInput): Promise<CreateTaskBody> {
+export async function buildNewTask(resolver: Resolver, input: CreateInput): Promise<NewTask> {
   const projectId = await resolver.resolve({ kind: "project", value: input.project });
-  const body: CreateTaskBody = { title: input.title, projectId };
-  if (input.column !== undefined) body.boardColumnId = await resolver.resolve({ kind: "column", value: input.column, scope: { projectId } });
-  if (input.assignee !== undefined) body.userId = await resolver.resolve({ kind: "member", value: input.assignee });
-  if (input.due !== undefined) body.dayFrom = parseDueDate(input.due);
-  if (input.description !== undefined) body.description = input.description;
-  return body;
+  const newTask: NewTask = { title: input.title, projectId };
+  if (input.column !== undefined) newTask.boardColumnId = await resolver.resolve({ kind: "column", value: input.column, scope: { projectId } });
+  if (input.assignee !== undefined) newTask.userId = await resolver.resolve({ kind: "member", value: input.assignee });
+  if (input.due !== undefined) newTask.dayFrom = parseDueDate(input.due);
+  if (input.description !== undefined) newTask.description = input.description;
+  return newTask;
 }
 
 const createShape = {
@@ -173,8 +173,8 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     },
     async (args) => {
       try {
-        const body = await buildCreateBody(resolver, args as CreateInput);
-        return jsonReply(await client.tasks.create(body));
+        const newTask = await buildNewTask(resolver, args as CreateInput);
+        return jsonReply(await client.tasks.create(newTask));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -189,8 +189,8 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
       const report: Array<{ ok: boolean; task?: unknown; error?: string; candidates?: unknown }> = [];
       for (const t of args.tasks) {
         try {
-          const body = await buildCreateBody(resolver, t as CreateInput);
-          report.push({ ok: true, task: await client.tasks.create(body) });
+          const newTask = await buildNewTask(resolver, t as CreateInput);
+          report.push({ ok: true, task: await client.tasks.create(newTask) });
         } catch (err) {
           const e = err as { name?: string; message?: string };
           const entry: { ok: false; error: string; candidates?: unknown } = { ok: false, error: e.message ?? String(err) };
@@ -246,8 +246,8 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     async (args) => {
       try {
         const safePath = await resolveSafeAttachPath(args.path, attachPolicy);
-        const data = await readFile(safePath);
-        return jsonReply(await client.tasks.uploadAttachment({ id: args.task_id, filename: basename(safePath), data }));
+        const bytes = await readFile(safePath);
+        return jsonReply(await client.tasks.uploadAttachment({ taskId: args.task_id, filename: basename(safePath), bytes }));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -258,7 +258,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     async (args) => {
       try {
         const columnId = await resolver.resolve({ kind: "column", value: args.column, scope: { boardId: args.board_id } });
-        return jsonReply(await client.tasks.move({ id: args.id, boardId: args.board_id, boardColumnId: columnId }));
+        return jsonReply(await client.tasks.move({ taskId: args.id, boardId: args.board_id, boardColumnId: columnId }));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -267,7 +267,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     "weeek_complete_task",
     { description: "Mark a WEEEK task complete, or reopen it (completed:false).", inputSchema: { id: z.number().int(), completed: z.boolean() } },
     async (args) => {
-      try { return jsonReply(await client.tasks.setCompleted({ id: args.id, completed: args.completed })); }
+      try { return jsonReply(await client.tasks.setCompleted({ taskId: args.id, completed: args.completed })); }
       catch (err) { return errorReply(err); }
     },
   );

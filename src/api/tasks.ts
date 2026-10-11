@@ -1,11 +1,11 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./shared.js";
-import type { Attachment, CreateTaskBody, WeeekTask } from "./types.js";
+import { pickArray } from "./responses.js";
+import type { Attachment, NewTask, WeeekTask } from "./types.js";
 
-export interface SetCompletedOptions { id: number; completed: boolean; }
-export interface MoveTaskOptions { id: number; boardId: number; boardColumnId: number; }
-export interface UploadAttachmentOptions { id: number; filename: string; data: Uint8Array | Blob; }
+export interface SetCompletedOptions { taskId: number; completed: boolean; }
+export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
+export interface UploadAttachmentOptions { taskId: number; filename: string; bytes: Uint8Array | Blob; }
 
 const ops = operations.tasks;
 
@@ -31,56 +31,56 @@ export class TasksApi {
   constructor(private http: HttpClient) {}
 
   async list(query: Query): Promise<WeeekTask[]> {
-    const j = await this.http.execute<Record<string, unknown>>(ops.list, { query });
-    return pickArray(j, "tasks").map(toTask);
+    const json = await this.http.execute<Record<string, unknown>>(ops.list, { query });
+    return pickArray(json, "tasks").map(toTask);
   }
 
-  async create(body: CreateTaskBody): Promise<WeeekTask> {
-    const location: Record<string, number> = { projectId: body.projectId };
-    if (body.boardColumnId !== undefined) location.boardColumnId = body.boardColumnId;
-    const payload: Record<string, unknown> = { title: body.title, locations: [location] };
-    if (body.description !== undefined) payload.description = body.description;
-    if (body.userId !== undefined) payload.userId = body.userId;
-    if (body.dayFrom !== undefined) payload.dayFrom = body.dayFrom;
-    const j = await this.http.execute<{ task: unknown }>(ops.create, { body: payload });
-    return toTask(j.task);
+  async create(newTask: NewTask): Promise<WeeekTask> {
+    const location: Record<string, number> = { projectId: newTask.projectId };
+    if (newTask.boardColumnId !== undefined) location.boardColumnId = newTask.boardColumnId;
+    const payload: Record<string, unknown> = { title: newTask.title, locations: [location] };
+    if (newTask.description !== undefined) payload.description = newTask.description;
+    if (newTask.userId !== undefined) payload.userId = newTask.userId;
+    if (newTask.dayFrom !== undefined) payload.dayFrom = newTask.dayFrom;
+    const json = await this.http.execute<{ task: unknown }>(ops.create, { body: payload });
+    return toTask(json.task);
   }
 
   async get(id: number): Promise<WeeekTask> {
-    const j = await this.http.execute<{ task: unknown }>(ops.get, { params: { taskId: id } });
-    return toTask(j.task);
+    const json = await this.http.execute<{ task: unknown }>(ops.get, { params: { taskId: id } });
+    return toTask(json.task);
   }
 
   async update(id: number, patch: Record<string, unknown>): Promise<WeeekTask> {
-    const j = await this.http.execute<{ task: unknown }>(ops.update, { params: { taskId: id }, body: patch });
-    return toTask(j.task);
+    const json = await this.http.execute<{ task: unknown }>(ops.update, { params: { taskId: id }, body: patch });
+    return toTask(json.task);
   }
 
   async remove(id: number): Promise<{ success: boolean }> {
     return this.http.execute<{ success: boolean }>(ops.remove, { params: { taskId: id } });
   }
 
-  async setCompleted({ id, completed }: SetCompletedOptions): Promise<WeeekTask> {
-    await this.http.execute(completed ? ops.complete : ops.uncomplete, { params: { taskId: id } });
-    return this.get(id);
+  async setCompleted({ taskId, completed }: SetCompletedOptions): Promise<WeeekTask> {
+    await this.http.execute(completed ? ops.complete : ops.uncomplete, { params: { taskId } });
+    return this.get(taskId);
   }
 
   // Two requests the API does not offer as one; if the second fails the task sits on the
   // new board in its old column (FOLLOWUPS #6).
-  async move({ id, boardId, boardColumnId }: MoveTaskOptions): Promise<WeeekTask> {
-    await this.http.execute(ops.changeBoard, { params: { taskId: id }, body: { boardId } });
-    await this.http.execute(ops.changeColumn, { params: { taskId: id }, body: { boardColumnId } });
-    return this.get(id);
+  async move({ taskId, boardId, boardColumnId }: MoveTaskOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.changeBoard, { params: { taskId }, body: { boardId } });
+    await this.http.execute(ops.changeColumn, { params: { taskId }, body: { boardColumnId } });
+    return this.get(taskId);
   }
 
-  async uploadAttachment({ id, filename, data }: UploadAttachmentOptions): Promise<Attachment[]> {
+  async uploadAttachment({ taskId, filename, bytes }: UploadAttachmentOptions): Promise<Attachment[]> {
     const form = new FormData();
-    const blob = data instanceof Blob ? data : new Blob([data as BlobPart]);
+    const blob = bytes instanceof Blob ? bytes : new Blob([bytes as BlobPart]);
     form.append("files[]", blob, filename);
-    const j = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId: id }, body: form });
+    const json = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId }, body: form });
     // The spec documents `data` as one Attachment; accept a list too — `files[]` is a
     // multipart array and the live shape has not been pinned down (FOLLOWUPS #18).
-    if (Array.isArray(j.data)) return j.data as Attachment[];
-    return j.data ? [j.data as Attachment] : [];
+    if (Array.isArray(json.data)) return json.data as Attachment[];
+    return json.data ? [json.data as Attachment] : [];
   }
 }

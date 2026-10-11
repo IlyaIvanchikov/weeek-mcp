@@ -45,12 +45,12 @@ const baseClient = {
 
 describe("task tools", () => {
   it("create_task resolves names to ids before creating", async () => {
-    const createTask = vi.fn(async (b: any) => ({ id: 5, ...b }));
-    const h = harness({ ...baseClient, tasks: { create: createTask } });
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
     const res = await h.get("weeek_create_task")!({
       title: "Ship it", project: "Marketing", column: "In Progress", assignee: "Ilya",
     });
-    expect(createTask).toHaveBeenCalledWith(expect.objectContaining({
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
       title: "Ship it", projectId: 1, boardColumnId: 100, userId: "u1",
     }));
     expect(JSON.parse(res.content[0].text).id).toBe(5);
@@ -64,8 +64,8 @@ describe("task tools", () => {
   });
 
   it("create_tasks reports per-item ok/error and does not abort on one bad name", async () => {
-    const createTask = vi.fn(async (b: any) => ({ id: 9, ...b }));
-    const h = harness({ ...baseClient, tasks: { create: createTask } });
+    const create = vi.fn(async (b: any) => ({ id: 9, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
     const res = await h.get("weeek_create_tasks")!({
       tasks: [
         { title: "good", project: "Marketing" },
@@ -76,12 +76,12 @@ describe("task tools", () => {
     expect(report[0].ok).toBe(true);
     expect(report[1].ok).toBe(false);
     expect(report[1].error).toMatch(/resolve/i);
-    expect(createTask).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("create_tasks surfaces candidates on a failed item without aborting the batch", async () => {
-    const createTask = vi.fn(async (b: any) => ({ id: 9, ...b }));
-    const h = harness({ ...baseClient, tasks: { create: createTask } });
+    const create = vi.fn(async (b: any) => ({ id: 9, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
     const res = await h.get("weeek_create_tasks")!({
       tasks: [
         { title: "good", project: "Marketing" },
@@ -95,69 +95,69 @@ describe("task tools", () => {
     expect(report[1].candidates).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 1, name: "Marketing" })]),
     );
-    expect(createTask).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("update_task never sends description (WEEEK ignores it) even if a caller passes one", async () => {
-    const updateTask = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
-    const h = harness({ ...baseClient, tasks: { update: updateTask } });
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { update } });
     await h.get("weeek_update_task")!({ id: 3, title: "New", description: "should be dropped" });
-    expect(updateTask).toHaveBeenCalledWith(3, { title: "New" });
-    expect(updateTask.mock.calls[0][1]).not.toHaveProperty("description");
+    expect(update).toHaveBeenCalledWith(3, { title: "New" });
+    expect(update.mock.calls[0][1]).not.toHaveProperty("description");
   });
 
   it("delete_task requires confirm:true — a bare {id} is rejected before any client call", () => {
-    const deleteTask = vi.fn(async (_id: number) => ({ success: true }));
-    const h = harness({ ...baseClient, tasks: { remove: deleteTask } });
+    const remove = vi.fn(async (_id: number) => ({ success: true }));
+    const h = harness({ ...baseClient, tasks: { remove } });
     expect(() => h.get("weeek_delete_task")!({ id: 42 })).toThrow();
     expect(() => h.get("weeek_delete_task")!({ id: 42, confirm: false })).toThrow();
-    expect(deleteTask).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("delete_task deletes only when confirm:true is passed", async () => {
-    const deleteTask = vi.fn(async (_id: number) => ({ success: true }));
-    const h = harness({ ...baseClient, tasks: { remove: deleteTask } });
+    const remove = vi.fn(async (_id: number) => ({ success: true }));
+    const h = harness({ ...baseClient, tasks: { remove } });
     const res = await h.get("weeek_delete_task")!({ id: 42, confirm: true });
-    expect(deleteTask).toHaveBeenCalledWith(42);
+    expect(remove).toHaveBeenCalledWith(42);
     expect(JSON.parse(res.content[0].text)).toEqual({ success: true });
   });
 
   it("attach_file refuses a path outside the allowed dir (no client call)", async () => {
-    const attachFile = vi.fn();
-    const h = harness({ ...baseClient, tasks: { uploadAttachment: attachFile } }); // jailed to /allowed
+    const uploadAttachment = vi.fn();
+    const h = harness({ ...baseClient, tasks: { uploadAttachment } }); // jailed to /allowed
     const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "/etc/passwd" });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toMatch(/outside/i);
-    expect(attachFile).not.toHaveBeenCalled();
+    expect(uploadAttachment).not.toHaveBeenCalled();
   });
 
   it("attach_file uploads a file inside the allowed dir under its basename", async () => {
-    const attachFile = vi.fn(async (_opts: { id: number; filename: string; data: unknown }) => [{ id: "a1", name: "ok.txt", url: "http://x", size: 3 }]);
-    const h = harness({ ...baseClient, tasks: { uploadAttachment: attachFile } }); // jailed to /allowed
+    const uploadAttachment = vi.fn(async (_opts: { taskId: number; filename: string; bytes: unknown }) => [{ id: "a1", name: "ok.txt", url: "http://x", size: 3 }]);
+    const h = harness({ ...baseClient, tasks: { uploadAttachment } }); // jailed to /allowed
     const res = await h.get("weeek_attach_file")!({ task_id: 70, path: "ok.txt" });
-    expect(attachFile).toHaveBeenCalledWith({ id: 70, filename: "ok.txt", data: expect.anything() });
+    expect(uploadAttachment).toHaveBeenCalledWith({ taskId: 70, filename: "ok.txt", bytes: expect.anything() });
     expect(JSON.parse(res.content[0].text)[0].id).toBe("a1");
   });
 
   it("complete_task calls setCompleted", async () => {
-    const setCompleted = vi.fn(async ({ id, completed }: { id: number; completed: boolean }) => ({ id, completed }));
+    const setCompleted = vi.fn(async ({ taskId, completed }: { taskId: number; completed: boolean }) => ({ id: taskId, completed }));
     const h = harness({ ...baseClient, tasks: { setCompleted } });
     await h.get("weeek_complete_task")!({ id: 3, completed: true });
-    expect(setCompleted).toHaveBeenCalledWith({ id: 3, completed: true });
+    expect(setCompleted).toHaveBeenCalledWith({ taskId: 3, completed: true });
   });
 
   it("move_task resolves the column scoped to board_id (no project field) and moves the task", async () => {
-    const listColumns = vi.fn(async (_bid: number) => [
+    const list = vi.fn(async (_bid: number) => [
       { id: 100, name: "In Progress" },
       { id: 101, name: "Done" },
     ]);
-    const moveTask = vi.fn(async ({ id, boardColumnId }: { id: number; boardId: number; boardColumnId: number }) => ({
-      id, boardColumnId, projectId: 1, title: "t", description: null, completed: false,
+    const move = vi.fn(async ({ taskId, boardColumnId }: { taskId: number; boardId: number; boardColumnId: number }) => ({
+      id: taskId, boardColumnId, projectId: 1, title: "t", description: null, completed: false,
     }));
-    const h = harness({ ...baseClient, columns: { list: listColumns }, tasks: { move: moveTask } });
+    const h = harness({ ...baseClient, columns: { list }, tasks: { move } });
     const res = await h.get("weeek_move_task")!({ id: 7, board_id: 20, column: "done" });
-    expect(listColumns).toHaveBeenCalledWith(20);
-    expect(moveTask).toHaveBeenCalledWith({ id: 7, boardId: 20, boardColumnId: 101 });
+    expect(list).toHaveBeenCalledWith(20);
+    expect(move).toHaveBeenCalledWith({ taskId: 7, boardId: 20, boardColumnId: 101 });
     expect(JSON.parse(res.content[0].text).id).toBe(7);
   });
 
@@ -180,22 +180,22 @@ describe("task tools", () => {
   });
 
   it("weeek_list_tasks with no args applies the default perPage/offset", async () => {
-    const listTasks = vi.fn(async () => []);
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({});
-    expect(listTasks.mock.calls[0][0]).toMatchObject({ perPage: 20, offset: 0 });
+    expect(list.mock.calls[0][0]).toMatchObject({ perPage: 20, offset: 0 });
   });
 
   it("weeek_list_tasks with a projectId filter still applies the default perPage", async () => {
-    const listTasks = vi.fn(async () => []);
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({ projectId: 5 });
-    expect(listTasks.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
+    expect(list.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
   });
 
   it("weeek_list_tasks forwards server-side user, status, and date filters", async () => {
-    const listTasks = vi.fn(async () => []);
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -203,7 +203,7 @@ describe("task tools", () => {
       endDate: "26.07.2026",
       limit: 50,
     });
-    expect(listTasks.mock.calls[0][0]).toMatchObject({
+    expect(list.mock.calls[0][0]).toMatchObject({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: 0,
       startDate: "21.07.2026",
@@ -216,10 +216,10 @@ describe("task tools", () => {
   it("weeek_list_tasks can collect every server-filtered page inside the connector", async () => {
     const firstPage = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
     const secondPage = [{ id: 51 }];
-    const listTasks = vi.fn()
+    const list = vi.fn()
       .mockResolvedValueOnce(firstPage)
       .mockResolvedValueOnce(secondPage);
-    const h = harness({ tasks: { list: listTasks } });
+    const h = harness({ tasks: { list } });
     const res = await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -229,14 +229,14 @@ describe("task tools", () => {
       allPages: true,
     });
     expect(JSON.parse(res.content[0].text)).toHaveLength(51);
-    expect(listTasks).toHaveBeenNthCalledWith(1, expect.objectContaining({ perPage: 50, offset: 0 }));
-    expect(listTasks).toHaveBeenNthCalledWith(2, expect.objectContaining({ perPage: 50, offset: 50 }));
+    expect(list).toHaveBeenNthCalledWith(1, expect.objectContaining({ perPage: 50, offset: 0 }));
+    expect(list).toHaveBeenNthCalledWith(2, expect.objectContaining({ perPage: 50, offset: 50 }));
   });
 
   it("weeek_list_tasks caps auto-pagination instead of looping forever on always-full pages", async () => {
     const fullPage = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
-    const listTasks = vi.fn(async () => fullPage); // never shorter than perPage → never self-terminates
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => fullPage); // never shorter than perPage → never self-terminates
+    const h = harness({ tasks: { list } });
     const res = await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -246,23 +246,23 @@ describe("task tools", () => {
       allPages: true,
     });
     expect(res.isError).toBe(true);
-    expect(listTasks).toHaveBeenCalledTimes(MAX_AUTO_PAGES);
+    expect(list).toHaveBeenCalledTimes(MAX_AUTO_PAGES);
   });
 
   it("weeek_list_tasks refuses unfiltered automatic pagination", async () => {
-    const listTasks = vi.fn(async () => []);
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
     const res = await h.get("weeek_list_tasks")!({ allPages: true });
     expect(res.isError).toBe(true);
-    expect(listTasks).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("weeek_list_tasks requires date filters as a pair", async () => {
-    const listTasks = vi.fn(async () => []);
-    const h = harness({ tasks: { list: listTasks } });
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
     const res = await h.get("weeek_list_tasks")!({ startDate: "21.07.2026" });
     expect(res.isError).toBe(true);
-    expect(listTasks).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("weeek_get_task returns an error reply when the client rejects", async () => {

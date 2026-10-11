@@ -6,8 +6,8 @@ export class AttachmentsApi {
   constructor(private http: HttpClient) {}
 
   async get(id: string): Promise<Attachment> {
-    const j = await this.http.execute<{ data?: unknown }>(operations.attachments.get, { params: { fileId: id } });
-    return j.data as Attachment;
+    const json = await this.http.execute<{ data?: unknown }>(operations.attachments.get, { params: { fileId: id } });
+    return json.data as Attachment;
   }
 
   /**

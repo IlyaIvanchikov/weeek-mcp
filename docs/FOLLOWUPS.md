@@ -6,8 +6,8 @@ None of these block v0.1; the create-by-name path is verified sound and token ha
 2. **`NameCache` request-coalescing** — two concurrent cold `get()` calls for the same key both run `load()`. Cache the in-flight promise. Wasteful, not incorrect.
 3. **`cache.ts` `get<T>` unchecked cast** — safe today because each key prefix (`projects`/`members`/`columns:`/`board-columns:`) maps to one type; nothing enforces it. Consider a typed cache-key registry.
 4. **`weeek_create_tasks` bulk handler vs `reply.ts` duplicate `ResolutionError`→candidates logic** — two implementations of the same rule (the bulk handler in `src/tools/tasks.ts` and `errorReply` in `src/tools/reply.ts`). Extract one helper so a future tweak (e.g. cap candidate count) touches one place.
-5. ~~**`client.moveTask(id, boardId, boardColumnId)`** — three same-typed positional `number` args (the swap-is-silently-type-safe pattern the repo's own rules flag). Bundle into an options object.~~ — RESOLVED: `TasksApi.move({ id, boardId, boardColumnId })` takes an options object.
-6. **`moveTask` is two non-atomic POSTs** (`/board` then `/board-column`). If the second fails, the task is on the new board with its old column, surfaced only as a generic error. Likely a WEEEK API limitation; track, don't block.
+5. ~~**`client.moveTask(id, boardId, boardColumnId)`** — three same-typed positional `number` args (the swap-is-silently-type-safe pattern the repo's own rules flag). Bundle into an options object.~~ — RESOLVED: `TasksApi.move({ taskId, boardId, boardColumnId })` takes an options object.
+6. **`TasksApi.move` is two non-atomic POSTs** (`/board` then `/board-column`). If the second fails, the task is on the new board with its old column, surfaced only as a generic error. Likely a WEEEK API limitation; track, don't block.
 7. **Version string duplicated 3×** — `package.json:3`, `manifest.json:4`, `server.ts:13`. Derive `server.ts`/manifest from `package.json` (single source of truth).
 8. **`index.ts` `(err as Error).message`** assumes every rejection is an `Error`. Safe today (`loadConfig` always throws `Error`), unenforced.
 9. ~~**`tests/server.test.ts`** only asserts `buildServer()` doesn't throw — add an assertion that a specific tool (e.g. `weeek_create_task`) is actually registered, so a registration regression is caught.~~ — RESOLVED: `tests/server.test.ts` now lists tools over an in-memory transport and compares the exact default set.
@@ -25,7 +25,7 @@ None of these block v0.1; the create-by-name path is verified sound and token ha
 20. **Phase 2 entry list from the Phase 1 review** — do these before or alongside the first Phase 2 toolset:
     - Tie `Kind.shape` to the id type (`IntegerKind | UuidKind`) before the first new kind, so a kind cannot declare a `uuid` shape with numeric ids.
     - Add a `manifest.json` `user_config` entry for `WEEEK_TOOLSETS` once the `projects` toolset exists.
-    - Add `tests/api/shared.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.
+    - Add `tests/api/responses.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.
     - Restore the resolver cases dropped in Phase 1: board-scoped numeric passthrough, UUID trimming, the five-candidate cap, and the `needs … projectId` text for column.
     - Use OpenAPI's eight methods in `tests/spec.test.ts` and `tests/contract.test.ts`, not the five the server calls today.
     - Typecheck `tests/` in CI (a `tsconfig.tests.json`); tidy the pre-existing `vi.fn()` tuple errors it reports first.

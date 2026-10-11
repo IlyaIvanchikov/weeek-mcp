@@ -57,18 +57,18 @@ describe("TasksApi", () => {
 
   it("setCompleted posts to /complete or /un-complete, then re-reads the task", async () => {
     const f = jsonFetch(200, { success: true, task: { ...rawTask, isCompleted: true } });
-    const t = await new TasksApi(httpWith(f)).setCompleted({ id: 78, completed: true });
+    const t = await new TasksApi(httpWith(f)).setCompleted({ taskId: 78, completed: true });
     expect(t.completed).toBe(true);
     expect(sent(f, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/complete");
     expect(sent(f, 1).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
     const g = jsonFetch(200, { success: true, task: rawTask });
-    await new TasksApi(httpWith(g)).setCompleted({ id: 78, completed: false });
+    await new TasksApi(httpWith(g)).setCompleted({ taskId: 78, completed: false });
     expect(sent(g, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/un-complete");
   });
 
   it("move posts board then board-column, then fetches the task", async () => {
     const f = jsonFetch(200, { success: true, task: rawTask });
-    await new TasksApi(httpWith(f)).move({ id: 7, boardId: 3, boardColumnId: 4 });
+    await new TasksApi(httpWith(f)).move({ taskId: 7, boardId: 3, boardColumnId: 4 });
     expect(f.mock.calls.length).toBe(3);
     expect(sent(f, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/7/board");
     expect(sent(f, 0).json()).toEqual({ boardId: 3 });
@@ -80,13 +80,13 @@ describe("TasksApi", () => {
   it("uploadAttachment posts multipart files[] and returns the attachments as a list — object or array shape", async () => {
     const att = { id: "a1", creatorId: "u1", service: "weeek", name: "f.md", url: "http://x", size: 3, createdAt: "2026-08-01T10:00:00Z" };
     const single = jsonFetch(200, { success: true, data: att });
-    expect(await new TasksApi(httpWith(single)).uploadAttachment({ id: 7, filename: "f.md", data: new Uint8Array([1, 2, 3]) })).toEqual([att]);
+    expect(await new TasksApi(httpWith(single)).uploadAttachment({ taskId: 7, filename: "f.md", bytes: new Uint8Array([1, 2, 3]) })).toEqual([att]);
     const { url, init } = sent(single);
     expect(url).toBe("https://api.weeek.net/public/v1/tm/tasks/7/attachments");
     expect(init.body).toBeInstanceOf(FormData);
     expect(((init.body as FormData).get("files[]") as File).name).toBe("f.md");
     expect(init.headers).not.toHaveProperty("content-type");
     const list = jsonFetch(200, { success: true, data: [att] });
-    expect(await new TasksApi(httpWith(list)).uploadAttachment({ id: 7, filename: "f.md", data: new Uint8Array([1]) })).toEqual([att]);
+    expect(await new TasksApi(httpWith(list)).uploadAttachment({ taskId: 7, filename: "f.md", bytes: new Uint8Array([1]) })).toEqual([att]);
   });
 });

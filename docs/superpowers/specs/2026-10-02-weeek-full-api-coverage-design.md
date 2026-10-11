@@ -213,14 +213,14 @@ and name field.
 2. Resolve everything, in dependency order (funnel → status; then assignee / contact /
    organization in parallel).
 3. A pure builder (`buildCreateDealBody(resolver, input)`) returns the typed request body.
-   Builders are unit-tested without MCP, like today's `buildCreateBody`.
+   Builders are unit-tested without MCP, like today's `buildNewTask`.
 4. One API call: `client.crm.deals.create({ statusId, body })`.
 5. Reply via `jsonReply`; the tool then invalidates the cache keys its write dirties
    (`cache.invalidate("tags")` after creating a tag). The tool knows what it dirtied; the
    cache and resolver do not learn which tool does what. Today nothing invalidates — create a
    project, reference it by name within 60 s, and resolution fails. This closes that.
 
-Resolve-all-then-write means a bad name never leaves a half-applied change. `moveTask`'s two
+Resolve-all-then-write means a bad name never leaves a half-applied change. `TasksApi.move`'s two
 sequential POSTs (FOLLOWUPS #6) stay as they are.
 
 ### 4.2 Errors
