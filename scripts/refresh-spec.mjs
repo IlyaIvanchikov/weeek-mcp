@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// scripts/refresh-spec.mjs
-//
 // Re-extract WEEEK's public OpenAPI spec into spec/weeek-openapi.json.
 //
 // WHY THIS EXISTS: developers.weeek.net is a client-rendered docs site. Every HTML path
@@ -12,20 +10,32 @@
 //   3. import() the spec chunk     → it `export`s the resolved `schema` object
 //   4. write it back as plain JSON, turning shared schema objects into $ref links
 //
+// TRUST: step 3 imports and executes JavaScript served by developers.weeek.net. That is the
+// only way the docs site exposes the spec, and it runs only on the developer's machine that
+// runs this script — never in CI and never in the shipped server.
+//
+// Needs:   Node >= 18 (for fetch); curl only when REFRESH_SPEC_INTERFACE is set.
 // Usage:   npm run refresh-spec
+// Success: wrote …/spec/weeek-openapi.json: openapi 3.1.1, 99 paths, 157 operations, 35 schemas (from weeek.yaml-<hash>.js)
 // Then:    npx vitest run tests/contract.test.ts   — fails for every new or removed operation
 //
 // WHEN IT FAILS
-//   "fetch failed" / ENOTFOUND  → DNS. On the office VPN the weeek.net zone is black-holed;
-//                                 fix: resolvectl domain wlo1 IGD_BELTELECOM '~weeek.net' && resolvectl flush-caches
-//                                 (re-run after every Wi-Fi reconnect).
-//   connect timeout on the docs host → the tunnel blocks it; set REFRESH_SPEC_INTERFACE=wlo1
-//                                 to bind the request past the VPN (curl's --interface; node
-//                                 has no equivalent, so the script shells out to curl then).
+//   "fetch failed" / ENOTFOUND  → DNS. A VPN resolver may black-hole the weeek.net zone. Route
+//                                 the zone through your non-VPN link instead:
+//                                   resolvectl domain <interface> '~weeek.net' && resolvectl flush-caches
+//                                 Find <interface> with `ip route get 1.1.1.1` (the `dev` field)
+//                                 and check its DNS link with `resolvectl status`. Re-run after
+//                                 every network reconnect, which resets the setting.
+//   connect timeout on the docs host → a VPN tunnel blocks it. Run with
+//                                   REFRESH_SPEC_INTERFACE=<interface> npm run refresh-spec
+//                                 (same `ip route get 1.1.1.1` to find it). This binds the request
+//                                 to that interface via curl's --interface; Node's fetch has no
+//                                 equivalent, so the script shells out to curl then.
 //   "entry script not found" / "spec chunk not found" → the docs app changed its layout.
 //                                 Open developers.weeek.net in a browser, Network tab, find the
 //                                 chunk whose name contains "weeek.yaml", and update the regexes.
-import { mkdir, writeFile } from "node:fs/promises";
+//                                 This needs a human: the new layout cannot be guessed.
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -42,7 +52,9 @@ async function fetchText(url) {
     if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
     return res.text();
   }
-  const { stdout } = await promisify(execFile)("curl", ["-sS", "--interface", iface, "--max-time", "60", url], { maxBuffer: 64 * 1024 * 1024 });
+  // --fail makes an HTTP error an error; without it curl returns the error page as the body
+  // and the script reports a misleading "entry script not found".
+  const { stdout } = await promisify(execFile)("curl", ["-sS", "--fail", "--interface", iface, "--max-time", "60", url], { maxBuffer: 64 * 1024 * 1024 });
   return stdout;
 }
 
@@ -56,8 +68,13 @@ if (!chunk) throw new Error("spec chunk not found in the entry script");
 
 const chunkJs = await fetchText(`${DOCS}/assets/${chunk}`);
 const tmp = join(tmpdir(), `weeek-spec-${Date.now()}.mjs`);
-await writeFile(tmp, chunkJs);
-const { schema } = await import(pathToFileURL(tmp).href);
+let schema;
+try {
+  await writeFile(tmp, chunkJs);
+  ({ schema } = await import(pathToFileURL(tmp).href));
+} finally {
+  await rm(tmp, { force: true });
+}
 
 // The chunk resolves every $ref into a shared object graph (recursive where the spec is).
 // Walk it back to JSON: a schema object is written in full once, under components.schemas,

@@ -81,10 +81,15 @@ WEEEK_TOOLSETS=all npx -y weeek-mcp-smart
 every operation it declares is either implemented or explicitly deferred — so an API change
 shows up as a failing test, not as a surprise in production.
 
+It needs Node ≥ 18 (for `fetch`), and `curl` only when `REFRESH_SPEC_INTERFACE` is set.
+
 ```bash
 npm run refresh-spec            # re-extract from developers.weeek.net
 npx vitest run tests/contract.test.ts
 ```
+
+A successful refresh prints one line such as
+`wrote …/spec/weeek-openapi.json: openapi 3.1.1, 99 paths, 157 operations, 35 schemas (from weeek.yaml-<hash>.js)`.
 
 If the refresh fails with a DNS or connection error, read the comment at the top of
 `scripts/refresh-spec.mjs` — it lists the known causes (VPN resolver, blocked tunnel) and the
