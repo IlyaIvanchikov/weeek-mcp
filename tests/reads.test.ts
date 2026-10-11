@@ -24,7 +24,7 @@ function harness(clientOver: Record<string, any>, maxBytes = 1024) {
 
 describe("read tools", () => {
   it("weeek_get_task returns the task as JSON text", async () => {
-    const h = harness({ getTask: async (id: number) => ({ id, title: "T" }) });
+    const h = harness({ tasks: { get: async (id: number) => ({ id, title: "T" }) } });
     const res = await h.get("weeek_get_task")!({ id: 7 });
     expect(JSON.parse(res.content[0].text)).toEqual({ id: 7, title: "T" });
   });
@@ -37,34 +37,34 @@ describe("read tools", () => {
   });
 
   it("weeek_list_projects returns the list", async () => {
-    const h = harness({ listProjects: async () => [{ id: 1, name: "Marketing" }] });
+    const h = harness({ projects: { list: async () => [{ id: 1, name: "Marketing" }] } });
     const res = await h.get("weeek_list_projects")!({});
     expect(JSON.parse(res.content[0].text)).toEqual([{ id: 1, name: "Marketing" }]);
   });
 
   it("weeek_list_members returns the members list", async () => {
-    const h = harness({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
+    const h = harness({ workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] } });
     const res = await h.get("weeek_list_members")!({});
     expect(JSON.parse(res.content[0].text)).toEqual([{ id: "u1", name: "Ilya" }]);
   });
 
   it("weeek_list_tasks with no args applies the default perPage/offset", async () => {
     const listTasks = vi.fn(async () => []);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     await h.get("weeek_list_tasks")!({});
     expect(listTasks.mock.calls[0][0]).toMatchObject({ perPage: 20, offset: 0 });
   });
 
   it("weeek_list_tasks with a projectId filter still applies the default perPage", async () => {
     const listTasks = vi.fn(async () => []);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     await h.get("weeek_list_tasks")!({ projectId: 5 });
     expect(listTasks.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
   });
 
   it("weeek_list_tasks forwards server-side user, status, and date filters", async () => {
     const listTasks = vi.fn(async () => []);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -88,7 +88,7 @@ describe("read tools", () => {
     const listTasks = vi.fn()
       .mockResolvedValueOnce(firstPage)
       .mockResolvedValueOnce(secondPage);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     const res = await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -105,7 +105,7 @@ describe("read tools", () => {
   it("weeek_list_tasks caps auto-pagination instead of looping forever on always-full pages", async () => {
     const fullPage = Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }));
     const listTasks = vi.fn(async () => fullPage); // never shorter than perPage → never self-terminates
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     const res = await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
       completed: false,
@@ -120,7 +120,7 @@ describe("read tools", () => {
 
   it("weeek_list_tasks refuses unfiltered automatic pagination", async () => {
     const listTasks = vi.fn(async () => []);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     const res = await h.get("weeek_list_tasks")!({ allPages: true });
     expect(res.isError).toBe(true);
     expect(listTasks).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe("read tools", () => {
 
   it("weeek_list_tasks requires date filters as a pair", async () => {
     const listTasks = vi.fn(async () => []);
-    const h = harness({ listTasks });
+    const h = harness({ tasks: { list: listTasks } });
     const res = await h.get("weeek_list_tasks")!({ startDate: "21.07.2026" });
     expect(res.isError).toBe(true);
     expect(listTasks).not.toHaveBeenCalled();
@@ -136,9 +136,11 @@ describe("read tools", () => {
 
   it("weeek_get_task returns an error reply when the client rejects", async () => {
     const h = harness({
-      getTask: vi.fn(async () => {
-        throw new Error("boom");
-      }),
+      tasks: {
+        get: vi.fn(async () => {
+          throw new Error("boom");
+        }),
+      },
     });
     const res = await h.get("weeek_get_task")!({ id: 7 });
     expect(res.isError).toBe(true);
@@ -161,8 +163,10 @@ describe("read tools", () => {
       url: "https://api.weeek.net/f/a1", size: png.length, createdAt: "2026-08-01T10:00:00Z",
     };
     const h = harness({
-      getAttachment: async () => attachment,
-      downloadAttachment: async () => ({ bytes: png, contentType: "image/png" }),
+      attachments: {
+        get: async () => attachment,
+        download: async () => ({ bytes: png, contentType: "image/png" }),
+      },
     });
     const res = await h.get("weeek_get_attachment")!({ id: "a1" });
     expect(res.content[0]).toEqual({
@@ -178,7 +182,7 @@ describe("read tools", () => {
       url: "https://api.weeek.net/f/a2", size: 12, createdAt: "2026-08-01T10:00:00Z",
     };
     const download = vi.fn(async () => ({ bytes: new Uint8Array([1, 2]), contentType: "application/pdf" }));
-    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const h = harness({ attachments: { get: async () => attachment, download } });
     const res = await h.get("weeek_get_attachment")!({ id: "a2" });
     const body = JSON.parse(res.content[0].text);
     expect(body.attachment).toEqual(attachment);
@@ -191,7 +195,7 @@ describe("read tools", () => {
       url: "https://drive.google.com/file/a3", createdAt: "2026-08-01T10:00:00Z",
     };
     const download = vi.fn();
-    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const h = harness({ attachments: { get: async () => attachment, download } });
     const res = await h.get("weeek_get_attachment")!({ id: "a3" });
     const body = JSON.parse(res.content[0].text);
     expect(body.attachment).toEqual(attachment);
@@ -205,7 +209,7 @@ describe("read tools", () => {
       url: "https://api.weeek.net/f/a4", size: 4, createdAt: "2026-08-01T10:00:00Z",
     };
     const download = vi.fn();
-    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download });
+    const h = harness({ attachments: { get: async () => attachment, download } });
     const res = await h.get("weeek_get_attachment")!({ id: "a4", metadataOnly: true });
     expect(JSON.parse(res.content[0].text).attachment).toEqual(attachment);
     expect(download).not.toHaveBeenCalled();
@@ -217,7 +221,7 @@ describe("read tools", () => {
       url: "https://api.weeek.net/f/a5", size: 4, createdAt: "2026-08-01T10:00:00Z",
     };
     const download = vi.fn(async () => ({ bytes: new Uint8Array([1]), contentType: "image/png" }));
-    const h = harness({ getAttachment: async () => attachment, downloadAttachment: download }, 4096);
+    const h = harness({ attachments: { get: async () => attachment, download } }, 4096);
     await h.get("weeek_get_attachment")!({ id: "a5" });
     expect(download).toHaveBeenCalledWith({ attachment, maxBytes: 4096 });
   });
@@ -228,8 +232,10 @@ describe("read tools", () => {
       url: "https://api.weeek.net/f/a6", size: 99999, createdAt: "2026-08-01T10:00:00Z",
     };
     const h = harness({
-      getAttachment: async () => attachment,
-      downloadAttachment: async () => { throw new Error("attachment a6 is too large (99999 > 1024 bytes)"); },
+      attachments: {
+        get: async () => attachment,
+        download: async () => { throw new Error("attachment a6 is too large (99999 > 1024 bytes)"); },
+      },
     });
     const res = await h.get("weeek_get_attachment")!({ id: "a6" });
     expect(res.isError).toBe(true);

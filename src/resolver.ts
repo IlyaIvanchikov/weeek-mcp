@@ -26,7 +26,7 @@ export class Resolver {
   async resolveProject(value: string | number): Promise<number> {
     const id = asId(value);
     if (id !== null) return id;
-    const list = await this.cache.get("projects", () => this.client.listProjects());
+    const list = await this.cache.get("projects", () => this.client.projects.list());
     return Resolver.pickUnique<number>("project", String(value), list);
   }
 
@@ -34,9 +34,9 @@ export class Resolver {
     const id = asId(value);
     if (id !== null) return id;
     const list = await this.cache.get(`columns:${projectId}`, async () => {
-      const boards = await this.client.listBoards(projectId);
+      const boards = await this.client.boards.list(projectId);
       const all: NamedEntity[] = [];
-      for (const b of boards) all.push(...(await this.client.listColumns(b.id)));
+      for (const b of boards) all.push(...(await this.client.columns.list(b.id)));
       return all;
     });
     return Resolver.pickUnique<number>("column", String(value), list);
@@ -45,7 +45,7 @@ export class Resolver {
   async resolveColumnInBoard(boardId: number, value: string | number): Promise<number> {
     const id = asId(value);
     if (id !== null) return id;
-    const list = await this.cache.get(`board-columns:${boardId}`, () => this.client.listColumns(boardId));
+    const list = await this.cache.get(`board-columns:${boardId}`, () => this.client.columns.list(boardId));
     return Resolver.pickUnique<number>("column", String(value), list);
   }
 
@@ -53,7 +53,7 @@ export class Resolver {
     if (typeof value === "number") return String(value);
     const v = value.trim();
     if (UUID_RE.test(v)) return v; // real WEEEK user-id passthrough
-    const list: Member[] = await this.cache.get("members", () => this.client.listMembers());
+    const list: Member[] = await this.cache.get("members", () => this.client.workspace.listMembers());
     return Resolver.pickUnique<string>("assignee", value, list);
   }
 }

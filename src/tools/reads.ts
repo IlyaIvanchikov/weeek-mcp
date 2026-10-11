@@ -31,7 +31,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
     "weeek_list_projects",
     { description: "List WEEEK projects (id + name).", inputSchema: {} },
     async () => {
-      try { return jsonReply(await client.listProjects()); }
+      try { return jsonReply(await client.projects.list()); }
       catch (err) { return errorReply(err); }
     },
   );
@@ -70,7 +70,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
         if (!args.allPages) {
           query.perPage = args.limit;
           query.offset = args.offset;
-          return jsonReply(await client.listTasks(query));
+          return jsonReply(await client.tasks.list(query));
         }
 
         if (!args.userId || !args.startDate || !args.endDate) {
@@ -80,7 +80,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
         const tasks: WeeekTask[] = [];
         let offset = args.offset;
         for (let page = 0; page < MAX_AUTO_PAGES; page++) {
-          const batch = await client.listTasks({ ...query, perPage: args.limit, offset });
+          const batch = await client.tasks.list({ ...query, perPage: args.limit, offset });
           tasks.push(...batch);
           if (batch.length < args.limit) return jsonReply(tasks);
           offset += args.limit;
@@ -94,7 +94,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
     "weeek_get_task",
     { description: "Get one WEEEK task by id (includes its assignees).", inputSchema: { id: z.number().int() } },
     async (args) => {
-      try { return jsonReply(await client.getTask(args.id)); }
+      try { return jsonReply(await client.tasks.get(args.id)); }
       catch (err) { return errorReply(err); }
     },
   );
@@ -111,7 +111,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
     },
     async (args) => {
       try {
-        const attachment = await client.getAttachment(args.id);
+        const attachment = await client.attachments.get(args.id);
         if (args.metadataOnly) return jsonReply({ attachment });
         if (attachment.service !== "weeek") {
           return jsonReply({
@@ -119,7 +119,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
             note: `stored in ${attachment.service}, not in WEEEK; open its url directly — only weeek-hosted attachments can be read through this tool`,
           });
         }
-        const { bytes, contentType } = await client.downloadAttachment({
+        const { bytes, contentType } = await client.attachments.download({
           attachment,
           maxBytes: policy.maxBytes,
         });
@@ -140,7 +140,7 @@ export function registerReadTools(server: McpServer, client: WeeekClient, policy
       inputSchema: {},
     },
     async () => {
-      try { return jsonReply(await client.listMembers()); }
+      try { return jsonReply(await client.workspace.listMembers()); }
       catch (err) { return errorReply(err); }
     },
   );

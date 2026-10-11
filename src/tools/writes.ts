@@ -50,7 +50,7 @@ export function registerWriteTools(
     async (args) => {
       try {
         const body = await buildCreateBody(resolver, args as CreateInput);
-        return jsonReply(await client.createTask(body));
+        return jsonReply(await client.tasks.create(body));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -66,7 +66,7 @@ export function registerWriteTools(
       for (const t of args.tasks) {
         try {
           const body = await buildCreateBody(resolver, t as CreateInput);
-          report.push({ ok: true, task: await client.createTask(body) });
+          report.push({ ok: true, task: await client.tasks.create(body) });
         } catch (err) {
           const e = err as { name?: string; message?: string };
           const entry: { ok: false; error: string; candidates?: unknown } = { ok: false, error: e.message ?? String(err) };
@@ -89,7 +89,7 @@ export function registerWriteTools(
         const patch: Record<string, unknown> = {};
         if (args.title !== undefined) patch.title = args.title;
         if (args.due !== undefined) patch.dayFrom = parseDueDate(args.due);
-        return jsonReply(await client.updateTask(args.id, patch));
+        return jsonReply(await client.tasks.update(args.id, patch));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -106,7 +106,7 @@ export function registerWriteTools(
       annotations: { destructiveHint: true, idempotentHint: false },
     },
     async (args) => {
-      try { return jsonReply(await client.deleteTask(args.id)); }
+      try { return jsonReply(await client.tasks.remove(args.id)); }
       catch (err) { return errorReply(err); }
     },
   );
@@ -123,7 +123,7 @@ export function registerWriteTools(
       try {
         const safePath = await resolveSafeAttachPath(args.path, attachPolicy);
         const data = await readFile(safePath);
-        return jsonReply(await client.attachFile(args.task_id, basename(safePath), data));
+        return jsonReply(await client.tasks.uploadAttachment({ id: args.task_id, filename: basename(safePath), data }));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -134,7 +134,7 @@ export function registerWriteTools(
     async (args) => {
       try {
         const columnId = await resolver.resolveColumnInBoard(args.board_id, args.column);
-        return jsonReply(await client.moveTask(args.id, args.board_id, columnId));
+        return jsonReply(await client.tasks.move({ id: args.id, boardId: args.board_id, boardColumnId: columnId }));
       } catch (err) { return errorReply(err); }
     },
   );
@@ -143,7 +143,7 @@ export function registerWriteTools(
     "weeek_complete_task",
     { description: "Mark a WEEEK task complete, or reopen it (completed:false).", inputSchema: { id: z.number().int(), completed: z.boolean() } },
     async (args) => {
-      try { return jsonReply(await client.setCompleted(args.id, args.completed)); }
+      try { return jsonReply(await client.tasks.setCompleted({ id: args.id, completed: args.completed })); }
       catch (err) { return errorReply(err); }
     },
   );

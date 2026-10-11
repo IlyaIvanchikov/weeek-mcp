@@ -15,13 +15,13 @@ describe("Resolver", () => {
   });
 
   it("resolves a unique case-insensitive name", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Marketing" }, { id: 2, name: "Sales" }] });
+    const client = clientWith({ projects: { list: async () => [{ id: 1, name: "Marketing" }, { id: 2, name: "Sales" }] } });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveProject("marketing")).toBe(1);
   });
 
   it("throws with candidates when the name is unknown", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Marketing" }] });
+    const client = clientWith({ projects: { list: async () => [{ id: 1, name: "Marketing" }] } });
     const r = new Resolver(client, freshCache());
     await expect(r.resolveProject("Markting")).rejects.toMatchObject({
       name: "ResolutionError", kind: "project",
@@ -29,15 +29,15 @@ describe("Resolver", () => {
   });
 
   it("throws with the duplicates when the name is ambiguous", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] });
+    const client = clientWith({ projects: { list: async () => [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] } });
     const r = new Resolver(client, freshCache());
     await expect(r.resolveProject("Ops")).rejects.toMatchObject({ name: "ResolutionError" });
   });
 
   it("resolves a column across the project's boards", async () => {
     const client = clientWith({
-      listBoards: async (_pid: number) => [{ id: 10, name: "Main" }],
-      listColumns: async (_bid: number) => [{ id: 100, name: "In Progress" }, { id: 101, name: "Done" }],
+      boards: { list: async (_pid: number) => [{ id: 10, name: "Main" }] },
+      columns: { list: async (_bid: number) => [{ id: 100, name: "In Progress" }, { id: 101, name: "Done" }] },
     });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveColumn(1, "in progress")).toBe(100);
@@ -45,11 +45,13 @@ describe("Resolver", () => {
 
   it("resolves a column that only exists on the second board (regression lock)", async () => {
     const client = clientWith({
-      listBoards: async (_pid: number) => [{ id: 10, name: "Main" }, { id: 20, name: "Secondary" }],
-      listColumns: async (bid: number) =>
-        bid === 10
-          ? [{ id: 100, name: "In Progress" }]
-          : [{ id: 200, name: "Backlog" }],
+      boards: { list: async (_pid: number) => [{ id: 10, name: "Main" }, { id: 20, name: "Secondary" }] },
+      columns: {
+        list: async (bid: number) =>
+          bid === 10
+            ? [{ id: 100, name: "In Progress" }]
+            : [{ id: 200, name: "Backlog" }],
+      },
     });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveColumn(1, "backlog")).toBe(200);
@@ -60,7 +62,7 @@ describe("Resolver", () => {
       { id: 100, name: "In Progress" },
       { id: 101, name: "Done" },
     ]);
-    const client = clientWith({ listColumns });
+    const client = clientWith({ columns: { list: listColumns } });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveColumnInBoard(10, "done")).toBe(101);
     expect(listColumns).toHaveBeenCalledWith(10);
@@ -68,7 +70,7 @@ describe("Resolver", () => {
 
   it("passes a numeric column id through without calling the API (board-scoped)", async () => {
     const listColumns = vi.fn();
-    const client = clientWith({ listColumns });
+    const client = clientWith({ columns: { list: listColumns } });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveColumnInBoard(10, 999)).toBe(999);
     expect(listColumns).not.toHaveBeenCalled();
@@ -82,13 +84,13 @@ describe("Resolver", () => {
   });
 
   it("resolves an assignee by name to the member's string id", async () => {
-    const client = clientWith({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
+    const client = clientWith({ workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] } });
     const r = new Resolver(client, freshCache());
     expect(await r.resolveAssignee("Ilya")).toBe("u1");
   });
 
   it("does not let a hex-looking display name pass through unresolved", async () => {
-    const client = clientWith({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
+    const client = clientWith({ workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] } });
     const r = new Resolver(client, freshCache());
     await expect(r.resolveAssignee("cafebabe")).rejects.toMatchObject({
       name: "ResolutionError", kind: "assignee",
