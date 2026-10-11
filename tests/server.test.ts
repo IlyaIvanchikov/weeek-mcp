@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { buildServer } from "../src/server.js";
 import { listTools } from "./helpers/list-tools.js";
 import { defaultToolNames } from "./helpers/default-tool-names.js";
+import { httpConfig } from "./helpers/http.js";
+import type { Config } from "../src/config.js";
 
-const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 30000, attachMaxBytes: 1024, toolsets: ["tasks"] as const };
+const cfg: Config = { ...httpConfig, attachMaxBytes: 1024, toolsets: ["tasks"] };
 
 describe("buildServer", () => {
   it("registers the default toolset's tools — the list a client actually receives", async () => {

@@ -1,6 +1,4 @@
-// src/client.ts
-import type { Config } from "./config.js";
-import { HttpClient } from "./http.js";
+import { HttpClient, type HttpConfig } from "./http.js";
 import { TasksApi } from "./api/tasks.js";
 import { ProjectsApi } from "./api/projects.js";
 import { BoardsApi } from "./api/boards.js";
@@ -22,7 +20,7 @@ export class WeeekClient {
   readonly workspace: WorkspaceApi;
   readonly attachments: AttachmentsApi;
 
-  constructor(cfg: Config, fetchImpl: typeof fetch = fetch) {
+  constructor(cfg: HttpConfig, fetchImpl: typeof fetch = fetch) {
     const http = new HttpClient(cfg, fetchImpl);
     this.tasks = new TasksApi(http);
     this.projects = new ProjectsApi(http);

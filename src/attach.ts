@@ -11,6 +11,12 @@ export interface AttachPolicy {
   maxBytes: number;
 }
 
+/** The reading half of the policy: what weeek_get_attachment may pull into a reply. */
+export interface AttachmentReadPolicy {
+  /** Largest attachment body to pull into the reply. */
+  maxBytes: number;
+}
+
 /**
  * Resolve a caller-supplied path to a safe absolute path, or throw.
  *

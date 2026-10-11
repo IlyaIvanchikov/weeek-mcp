@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TasksApi } from "../../src/api/tasks.js";
-import { jsonFetch, httpWith, sent } from "./helpers.js";
+import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
 const rawTask = { id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"], dueDate: "2026-07-22", isCompleted: false };
 

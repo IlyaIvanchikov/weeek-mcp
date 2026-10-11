@@ -1,14 +1,12 @@
-// tests/client.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { WeeekClient } from "../src/client.js";
 import { TasksApi } from "../src/api/tasks.js";
 import { AttachmentsApi } from "../src/api/attachments.js";
-
-const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000, attachMaxBytes: 1024 };
+import { httpConfig } from "./helpers/http.js";
 
 describe("WeeekClient facade", () => {
   it("exposes one resource client per API area", () => {
-    const c = new WeeekClient(cfg);
+    const c = new WeeekClient(httpConfig);
     expect(c.tasks).toBeInstanceOf(TasksApi);
     expect(c.attachments).toBeInstanceOf(AttachmentsApi);
     expect(typeof c.projects.list).toBe("function");
@@ -19,7 +17,7 @@ describe("WeeekClient facade", () => {
 
   it("routes every resource client through the same injected fetch", async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ success: true, projects: [] }), { status: 200, headers: { "content-type": "application/json" } }));
-    const c = new WeeekClient(cfg, f as unknown as typeof fetch);
+    const c = new WeeekClient(httpConfig, f as unknown as typeof fetch);
     await c.projects.list();
     expect(String(f.mock.calls[0][0])).toBe("https://api.weeek.net/public/v1/tm/projects");
   });

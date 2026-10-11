@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { expandToolsets, registerToolsets, defaultToolsets, toolsetNames } from "../src/toolsets.js";
-import { WeeekClient } from "../src/client.js";
-import { Resolver } from "../src/resolver.js";
-import { NameCache } from "../src/cache.js";
-import { listTools } from "./helpers/list-tools.js";
-import { defaultToolNames } from "./helpers/default-tool-names.js";
+import { expandToolsets, registerToolsets } from "../../src/toolsets/register.js";
+import { defaultToolsets, toolsetNames } from "../../src/toolsets/constants.js";
+import type { ToolContext } from "../../src/toolsets/types.js";
+import { WeeekClient } from "../../src/client.js";
+import { Resolver } from "../../src/resolver.js";
+import { NameCache } from "../../src/cache.js";
+import { listTools } from "../helpers/list-tools.js";
+import { defaultToolNames } from "../helpers/default-tool-names.js";
+import { httpConfig } from "../helpers/http.js";
 
-const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000, attachMaxBytes: 1024, toolsets: defaultToolsets };
-
-function context() {
-  const client = new WeeekClient(cfg);
+function context(): ToolContext {
+  const client = new WeeekClient(httpConfig);
   const cache = new NameCache(60_000);
   return {
     server: new McpServer({ name: "t", version: "0" }),

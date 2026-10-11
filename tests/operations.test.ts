@@ -1,4 +1,3 @@
-// tests/operations.test.ts
 import { describe, it, expect } from "vitest";
 import { operations, listOperations, httpMethods } from "../src/operations.js";
 

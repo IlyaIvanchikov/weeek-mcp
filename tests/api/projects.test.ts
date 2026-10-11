@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ProjectsApi } from "../../src/api/projects.js";
-import { jsonFetch, httpWith, sent, bearer } from "./helpers.js";
+import { jsonFetch, httpWith, sent, bearer } from "../helpers/http.js";
 
 describe("ProjectsApi", () => {
   it("list GETs /tm/projects with the bearer and normalises to {id,name}", async () => {

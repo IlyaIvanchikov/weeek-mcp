@@ -1,16 +1,8 @@
-// tests/http.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { HttpClient, fillPath } from "../src/http.js";
+import { httpConfig as cfg, bearer, jsonFetch, binaryFetch } from "./helpers/http.js";
 
-const cfg = { token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000, attachMaxBytes: 1024 };
-const auth = { Authorization: "Bearer " + "t".repeat(24) };
-
-function jsonFetch(status: number, body: unknown) {
-  return vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
-}
-function binaryFetch(status: number, bytes: Uint8Array, contentType: string) {
-  return vi.fn(async () => new Response(bytes as unknown as BodyInit, { status, headers: { "content-type": contentType } }));
-}
+const auth = { Authorization: bearer };
 const op = { method: "GET", path: "/tm/tasks/{taskId}" } as const;
 
 describe("fillPath", () => {
@@ -22,6 +14,9 @@ describe("fillPath", () => {
   });
   it("throws when a parameter is missing instead of sending a literal {taskId}", () => {
     expect(() => fillPath("/tm/tasks/{taskId}", {})).toThrow(/missing path parameter "taskId"/);
+  });
+  it.each(["", ".", ".."])("rejects %j, which the URL parser would turn into another endpoint", (value) => {
+    expect(() => fillPath("/tm/tasks/{taskId}", { taskId: value })).toThrow(/invalid path parameter "taskId"/);
   });
 });
 

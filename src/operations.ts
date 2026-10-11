@@ -1,5 +1,3 @@
-// src/operations.ts
-//
 // Every WEEEK API operation the server can call, as data. HttpClient executes an entry
 // from this map and nothing else, and tests/contract.test.ts compares the map with the
 // vendored spec in both directions — so an endpoint cannot be called without being

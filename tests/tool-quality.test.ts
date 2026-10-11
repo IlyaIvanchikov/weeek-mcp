@@ -1,18 +1,15 @@
-// tests/tool-quality.test.ts
-//
 // Encodes the properties Glama's Tool Definition Quality Score grades and the safety rule
 // this server promises in its README, so a new tool cannot quietly regress them.
 import { describe, it, expect, beforeAll } from "vitest";
 import { buildServer } from "../src/server.js";
 import { listTools } from "./helpers/list-tools.js";
+import { httpConfig } from "./helpers/http.js";
 
 type Tool = Awaited<ReturnType<typeof listTools>>[number];
 let tools: Tool[] = [];
 
 beforeAll(async () => {
-  tools = await listTools(buildServer({
-    token: "t".repeat(24), baseUrl: "https://api.weeek.net/public/v1", timeoutMs: 1000, attachMaxBytes: 1024, toolsets: ["all"],
-  }));
+  tools = await listTools(buildServer({ ...httpConfig, attachMaxBytes: 1024, toolsets: ["all"] }));
 });
 
 const VERB_NOUN = /^weeek_[a-z]+_[a-z]+(_[a-z]+)*$/;

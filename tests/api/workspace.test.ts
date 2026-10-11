@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { WorkspaceApi } from "../../src/api/workspace.js";
-import { jsonFetch, httpWith, sent } from "./helpers.js";
+import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
 describe("WorkspaceApi", () => {
   it("listMembers GETs /ws/members and joins first + last name", async () => {

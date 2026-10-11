@@ -3,7 +3,7 @@ import type { Config } from "./config.js";
 import { WeeekClient } from "./client.js";
 import { NameCache } from "./cache.js";
 import { Resolver } from "./resolver.js";
-import { registerToolsets } from "./toolsets.js";
+import { registerToolsets } from "./toolsets/register.js";
 import { NAME, VERSION } from "./version.js";
 
 export function buildServer(config: Config): McpServer {

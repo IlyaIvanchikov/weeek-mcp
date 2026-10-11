@@ -1,4 +1,4 @@
-import type { ToolContext } from "../toolsets.js";
+import type { ToolContext } from "../toolsets/types.js";
 import { NAME, VERSION } from "../version.js";
 import { jsonReply } from "./reply.js";
 

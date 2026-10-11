@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import type { ToolContext } from "../toolsets.js";
+import type { ToolContext } from "../toolsets/types.js";
 import type { CreateTaskBody, WeeekTask } from "../client.js";
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
@@ -18,11 +18,6 @@ export const MAX_AUTO_PAGES = 20;
 // from being steered elsewhere; the API declares file_id as a plain string, so this
 // deliberately does not demand a uuid it never promised.
 const ATTACHMENT_ID = /^[A-Za-z0-9_-]+$/;
-
-export interface AttachmentReadPolicy {
-  /** Largest attachment body to pull into the reply. */
-  maxBytes: number;
-}
 
 const nameOrId = z.union([z.string(), z.number()]);
 

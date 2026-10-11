@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BoardsApi } from "../../src/api/boards.js";
-import { jsonFetch, httpWith, sent } from "./helpers.js";
+import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
 describe("BoardsApi", () => {
   it("list GETs /tm/boards?projectId=…", async () => {

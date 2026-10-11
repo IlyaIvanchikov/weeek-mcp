@@ -7,9 +7,12 @@ export async function listTools(server: McpServer) {
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: "test", version: "0" });
-  await client.connect(clientSide);
-  const { tools } = await client.listTools();
-  await client.close();
-  await server.close();
-  return tools;
+  try {
+    await client.connect(clientSide);
+    const { tools } = await client.listTools();
+    return tools;
+  } finally {
+    await client.close();
+    await server.close();
+  }
 }

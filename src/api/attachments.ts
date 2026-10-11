@@ -32,13 +32,21 @@ export class AttachmentsApi {
     if (url.origin !== this.http.origin) {
       throw new Error(`attachment ${attachment.id} url origin ${url.origin} is not the WEEEK API origin ${this.http.origin}`);
     }
-    if (attachment.size !== undefined && attachment.size > maxBytes) {
-      throw new Error(`attachment ${attachment.id} is too large (${attachment.size} > ${maxBytes} bytes)`);
-    }
-    const { bytes, contentType } = await this.http.download(url);
-    if (bytes.byteLength > maxBytes) {
-      throw new Error(`attachment ${attachment.id} is too large (${bytes.byteLength} > ${maxBytes} bytes)`);
-    }
+    const tooLarge = (actual: number) => new Error(`attachment ${attachment.id} is too large (${actual} > ${maxBytes} bytes)`);
+    if (attachment.size !== undefined && attachment.size > maxBytes) throw tooLarge(attachment.size);
+    const { bytes, contentType } = await this.fetchBytes(attachment.id, url);
+    if (bytes.byteLength > maxBytes) throw tooLarge(bytes.byteLength);
     return { bytes, contentType };
+  }
+
+  // HttpClient is generic and cannot name the attachment, so its errors are prefixed here.
+  // The same object is rethrown so WeeekApiError's status and WeeekTimeoutError survive.
+  private async fetchBytes(id: string, url: URL): Promise<AttachmentBytes> {
+    try {
+      return await this.http.download(url);
+    } catch (err) {
+      if (err instanceof Error) err.message = `attachment ${id}: ${err.message}`;
+      throw err;
+    }
   }
 }

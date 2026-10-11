@@ -1,8 +1,8 @@
-// src/http.ts
 import type { Config } from "./config.js";
 import type { Operation } from "./operations.js";
 import { WeeekApiError, WeeekAuthError, WeeekTimeoutError } from "./errors.js";
 
+export type HttpConfig = Pick<Config, "token" | "baseUrl" | "timeoutMs">;
 export type Query = Record<string, string | number | boolean | undefined>;
 export type PathParams = Record<string, string | number>;
 export interface ExecuteOptions { params?: PathParams; query?: Query; body?: unknown; }
@@ -17,12 +17,16 @@ export function fillPath(template: string, params: PathParams = {}): string {
   return template.replace(/\{([^}]+)\}/g, (_match, name: string) => {
     const value = params[name];
     if (value === undefined) throw new Error(`missing path parameter "${name}" for ${template}`);
-    return encodeURIComponent(String(value));
+    const text = String(value);
+    // The URL parser resolves dot segments, and an empty segment drops the id, so either
+    // would change which endpoint is called.
+    if (text === "" || text === "." || text === "..") throw new Error(`invalid path parameter "${name}" for ${template}`);
+    return encodeURIComponent(text);
   });
 }
 
 export class HttpClient {
-  constructor(private cfg: Config, private fetchImpl: typeof fetch = fetch) {}
+  constructor(private cfg: HttpConfig, private fetchImpl: typeof fetch = fetch) {}
 
   get origin(): string {
     return new URL(this.cfg.baseUrl).origin;

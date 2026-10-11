@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { AttachmentsApi } from "../../src/api/attachments.js";
-import { jsonFetch, binaryFetch, httpWith, sent } from "./helpers.js";
+import { jsonFetch, binaryFetch, httpWith, sent } from "../helpers/http.js";
 
 const weeekFile = (over: Record<string, unknown> = {}) => ({
   id: "a1", creatorId: "u1", service: "weeek" as const, name: "modules.png",
@@ -50,5 +50,18 @@ describe("AttachmentsApi", () => {
     const f = binaryFetch(200, new Uint8Array(2048), "image/png");
     await expect(new AttachmentsApi(httpWith(f)).download({ attachment: weeekFile({ size: undefined }), maxBytes: 1024 })).rejects.toThrow(/too large/);
     expect(f).toHaveBeenCalled();
+  });
+
+  it("download names the attachment on an HTTP failure and keeps the WeeekApiError status", async () => {
+    const f = binaryFetch(403, new Uint8Array(), "text/plain");
+    const failure = new AttachmentsApi(httpWith(f)).download({ attachment: weeekFile(), maxBytes: 1024 });
+    await expect(failure).rejects.toMatchObject({ name: "WeeekApiError", status: 403 });
+    await expect(failure).rejects.toThrow(/attachment a1/);
+  });
+
+  it("download names the attachment when the storage host cannot be reached", async () => {
+    const f = vi.fn(async () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }); });
+    await expect(new AttachmentsApi(httpWith(f)).download({ attachment: weeekFile(), maxBytes: 1024 }))
+      .rejects.toThrow(/attachment a1.*could not reach/s);
   });
 });

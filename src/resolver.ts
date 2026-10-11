@@ -1,4 +1,3 @@
-// src/resolver.ts
 import type { WeeekClient } from "./client.js";
 import type { NameCache } from "./cache.js";
 import { ResolutionError, type Candidate } from "./errors.js";

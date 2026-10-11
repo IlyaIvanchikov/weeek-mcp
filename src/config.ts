@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { toolsetNames, defaultToolsets, type ToolsetName } from "./toolsets.js";
+import { toolsetNames, defaultToolsets } from "./toolsets/constants.js";
+import type { ToolsetName } from "./toolsets/types.js";
 
 const schema = z.object({
   // Optional at boot so the server can start and list its tools without credentials

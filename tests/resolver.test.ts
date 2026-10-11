@@ -1,4 +1,3 @@
-// tests/resolver.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";

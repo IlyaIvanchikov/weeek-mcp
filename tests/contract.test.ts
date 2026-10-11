@@ -1,5 +1,3 @@
-// tests/contract.test.ts
-//
 // The oracle for "all endpoints": the registry in src/operations.ts must match the vendored
 // spec in both directions. Placeholders are normalised because the spec names the same
 // parameter {id}, {task_id} or {taskId} depending on the endpoint, and ours are camelCase.

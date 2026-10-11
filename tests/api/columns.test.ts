@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ColumnsApi } from "../../src/api/columns.js";
-import { jsonFetch, httpWith, sent } from "./helpers.js";
+import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
 describe("ColumnsApi", () => {
   it("list GETs /tm/board-columns?boardId=…", async () => {
