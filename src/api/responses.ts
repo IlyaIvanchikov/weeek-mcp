@@ -1,4 +1,4 @@
-import type { Member } from "./types.js";
+import type { Member, Profile } from "./types.js";
 
 /** The API wraps lists under a resource-specific key; fall back to the first array present. */
 export function pickArray(obj: Record<string, unknown>, key: string): unknown[] {
@@ -12,4 +12,13 @@ export function toMember(raw: any): Member {
   const joined = [raw.firstName, raw.lastName].filter(Boolean).join(" ").trim();
   const name = joined || raw.name || raw.email || String(raw.id ?? "");
   return { id: String(raw.id ?? ""), name: String(name) };
+}
+
+export function toProfile(raw: any): Profile {
+  return {
+    ...toMember(raw),
+    email: String(raw.email ?? ""),
+    language: raw.language == null ? null : String(raw.language),
+    timeZone: raw.timeZone == null ? null : String(raw.timeZone),
+  };
 }

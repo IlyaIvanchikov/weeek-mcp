@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickArray, toMember } from "../../src/api/responses.js";
+import { pickArray, toMember, toProfile } from "../../src/api/responses.js";
 
 describe("pickArray", () => {
   it("returns the array under the expected key", () => {
@@ -21,5 +21,11 @@ describe("toMember", () => {
     expect(toMember({ id: "u2", name: "Bot" })).toEqual({ id: "u2", name: "Bot" });
     expect(toMember({ id: "u3", email: "x@y.z" })).toEqual({ id: "u3", name: "x@y.z" });
     expect(toMember({ id: "u4" })).toEqual({ id: "u4", name: "u4" });
+  });
+});
+
+describe("toProfile", () => {
+  it("keeps the member name rule and adds the profile fields, nulling the absent ones", () => {
+    expect(toProfile({ id: "u1", email: "i@x.y", firstName: "Ilya" })).toEqual({ id: "u1", name: "Ilya", email: "i@x.y", language: null, timeZone: null });
   });
 });

@@ -95,3 +95,19 @@ export interface NewBoard { name: string; projectId: number; }
 
 export interface BoardColumn { id: number; name: string; boardId: number; }
 export interface NewColumn { name: string; boardId: number; }
+
+export interface Tag { id: number; title: string; color: string; }
+export interface NewTag { title: string; }
+/** PUT /ws/tags/{id} replaces both fields. */
+export interface TagUpdate { title: string; color: string; }
+
+export interface Portfolio { id: number; name: string; parentId: number | null; isPrivate: boolean; }
+// A type alias, not an interface, so it is assignable to HttpClient's Query index signature.
+export type PortfolioQuery = { search?: string; parentId?: number; limit?: number; offset?: number };
+export interface PortfolioPage { portfolios: Portfolio[]; hasMore: boolean; }
+export interface NewPortfolio { name: string; parentId?: number; }
+
+export interface Workspace { id: number; title: string; description: string | null; isPersonal: boolean; }
+
+/** The token owner, as GET /user/me reports it. `name` is joined the way members' names are. */
+export interface Profile { id: string; name: string; email: string; language: string | null; timeZone: string | null; }
