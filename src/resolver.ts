@@ -4,35 +4,48 @@ import { ResolutionError, type Candidate } from "./errors.js";
 
 export const idShapes = ["integer", "uuid"] as const;
 export type IdShape = (typeof idShapes)[number];
+export const loadStrategies = ["list", "search"] as const;
+export type LoadStrategy = (typeof loadStrategies)[number];
+
+// A server-side search is never paged in full: this many candidates is plenty to pick one
+// exact match from or to show as suggestions.
+const searchPageSize = 50;
 
 export interface Named<Id extends number | string> { id: Id; name: string; }
 export interface ResolveScope { projectId?: number; boardId?: number; }
 
 /** What the resolver needs to know about one kind of named thing. */
-interface Kind<Id extends number | string> {
-  /** How an id looks, so one can be passed straight through instead of looked up. */
-  shape: IdShape;
+interface KindBase<Id extends number | string> {
   /** The word used in error messages — the tool parameter's name, not the API's. */
   label: string;
-  /** Cache key; must include every scope id the load depends on. */
-  key(scope: ResolveScope): string;
-  load(client: WeeekClient, scope: ResolveScope): Promise<Array<Named<Id>>>;
+  /** "list" loads the whole (small) collection once; "search" asks the API for the query and caches per query. */
+  strategy: LoadStrategy;
+  /** Cache prefix; must include every scope id the load depends on. A search kind caches under `${prefix}:${query}`. */
+  cacheKey(scope: ResolveScope): string;
+  load(client: WeeekClient, scope: ResolveScope, query: string): Promise<Array<Named<Id>>>;
 }
+// The shape names the id type, so a kind cannot declare uuid ids and load numeric ones.
+interface IntegerKind extends KindBase<number> { shape: "integer"; }
+interface UuidKind extends KindBase<string> { shape: "uuid"; }
+type Kind = IntegerKind | UuidKind;
 
 interface KindTable {
-  project: Kind<number>;
-  board: Kind<number>;
-  column: Kind<number>;
-  member: Kind<string>;
+  project: IntegerKind;
+  board: IntegerKind;
+  column: IntegerKind;
+  member: UuidKind;
+  tag: IntegerKind;
+  portfolio: IntegerKind;
 }
 export type KindName = keyof KindTable;
-type IdOf<K extends KindName> = KindTable[K] extends Kind<infer Id> ? Id : never;
+type IdOf<K extends KindName> = KindTable[K] extends IntegerKind ? number : string;
 
 export interface ResolveOptions<K extends KindName> {
   kind: K;
   value: string | number;
   scope?: ResolveScope;
 }
+export interface ForgetOptions { kind: KindName; scope?: ResolveScope; }
 
 const INTEGER_RE = /^\d+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,22 +55,20 @@ function requireScope<T>(value: T | undefined, label: string, field: string): T 
   return value;
 }
 
-// Only small, workspace-scoped lists belong here (the API has no filter for them). Kinds
-// the API can search server-side arrive in later phases with a "search" load.
 const kinds: KindTable = {
   project: {
-    shape: "integer", label: "project",
-    key: () => "projects",
+    shape: "integer", label: "project", strategy: "list",
+    cacheKey: () => "projects",
     load: (client) => client.projects.list(),
   },
   board: {
-    shape: "integer", label: "board",
-    key: (scope) => `boards:${requireScope(scope.projectId, "board", "projectId")}`,
+    shape: "integer", label: "board", strategy: "list",
+    cacheKey: (scope) => `boards:${requireScope(scope.projectId, "board", "projectId")}`,
     load: (client, scope) => client.boards.list(requireScope(scope.projectId, "board", "projectId")),
   },
   column: {
-    shape: "integer", label: "column",
-    key: (scope) => scope.boardId !== undefined
+    shape: "integer", label: "column", strategy: "list",
+    cacheKey: (scope) => scope.boardId !== undefined
       ? `board-columns:${scope.boardId}`
       : `columns:${requireScope(scope.projectId, "column", "boardId or projectId")}`,
     load: async (client, scope) => {
@@ -69,9 +80,20 @@ const kinds: KindTable = {
     },
   },
   member: {
-    shape: "uuid", label: "assignee",
-    key: () => "members",
+    shape: "uuid", label: "assignee", strategy: "list",
+    cacheKey: () => "members",
     load: (client) => client.workspace.listMembers(),
+  },
+  tag: {
+    shape: "integer", label: "tag", strategy: "list",
+    cacheKey: () => "tags",
+    // Tags carry `title`, not `name`; the resolver only ever matches on `name`.
+    load: async (client) => (await client.tags.list()).map((tag) => ({ id: tag.id, name: tag.title })),
+  },
+  portfolio: {
+    shape: "integer", label: "portfolio", strategy: "search",
+    cacheKey: () => "portfolios",
+    load: async (client, _scope, query) => (await client.portfolios.list({ search: query, limit: searchPageSize })).portfolios,
   },
 };
 
@@ -90,11 +112,26 @@ export class Resolver {
   }
 
   async resolve<K extends KindName>({ kind, value, scope = {} }: ResolveOptions<K>): Promise<IdOf<K>> {
-    const definition = kinds[kind] as Kind<IdOf<K>>;
+    const definition: Kind = kinds[kind];
     const id = Resolver.asId(definition.shape, value);
     if (id !== null) return id as IdOf<K>;
-    const list = await this.cache.get(definition.key(scope), () => definition.load(this.client, scope));
-    return Resolver.pickUnique<IdOf<K>>(definition.label, String(value), list);
+    const query = String(value).trim();
+    const key = Resolver.cacheKeyFor(definition, scope, query);
+    const list = (await this.cache.get<Array<Named<number | string>>>(key, () => definition.load(this.client, scope, query))) as unknown as Array<Named<IdOf<K>>>;
+    return Resolver.pickUnique<IdOf<K>>(definition.label, query, list);
+  }
+
+  /** Called by a write tool for every kind its write dirtied, so the next name lookup sees the change. */
+  forget({ kind, scope = {} }: ForgetOptions): void {
+    this.cache.invalidatePrefix(kinds[kind].cacheKey(scope));
+  }
+
+  private static cacheKeyFor(definition: Kind, scope: ResolveScope, query: string): string {
+    const prefix = definition.cacheKey(scope);
+    if (definition.strategy === "list") return prefix;
+    if (definition.strategy === "search") return `${prefix}:${query.toLowerCase()}`;
+    const _exhaustive: never = definition.strategy;
+    throw new Error(`unhandled load strategy ${String(_exhaustive)}`);
   }
 
   private static asId(shape: IdShape, value: string | number): number | string | null {

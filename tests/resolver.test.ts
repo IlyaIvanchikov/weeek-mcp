@@ -92,4 +92,59 @@ describe("Resolver.resolve", () => {
     const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u9", name: "Ilya I" }] } }), freshCache());
     expect(await r.resolve({ kind: "member", value: "ilya i" })).toBe("u9");
   });
+  it("passes a numeric id through for a scoped kind without needing the scope", async () => {
+    const list = vi.fn();
+    const r = new Resolver(clientWith({ boards: { list } }), freshCache());
+    expect(await r.resolve({ kind: "board", value: "10" })).toBe(10);
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("trims whitespace around a UUID before passing it through", async () => {
+    const uuid = "a2318d51-46cd-42a9-bab4-554c80824574";
+    const r = new Resolver(clientWith({ workspace: { listMembers: vi.fn() } }), freshCache());
+    expect(await r.resolve({ kind: "member", value: `  ${uuid} ` })).toBe(uuid);
+  });
+
+  it("caps substring candidates at five", async () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({ id: i + 1, name: `Ops ${i + 1}` }));
+    const r = new Resolver(clientWith({ projects: { list: async () => many } }), freshCache());
+    await expect(r.resolve({ kind: "project", value: "ops" })).rejects.toMatchObject({ candidates: many.slice(0, 5) });
+  });
+
+  it("names both scopes a column can be resolved in", async () => {
+    const r = new Resolver(clientWith({ columns: { list: async () => [] } }), freshCache());
+    await expect(r.resolve({ kind: "column", value: "Done" })).rejects.toThrow(/needs boardId or projectId/);
+  });
+
+  it("resolves a tag by its title", async () => {
+    const r = new Resolver(clientWith({ tags: { list: async () => [{ id: 5, title: "Urgent", color: "#f00" }] } }), freshCache());
+    expect(await r.resolve({ kind: "tag", value: "urgent" })).toBe(5);
+  });
+
+  it("resolves a portfolio through the server-side search, bounded and cached per query", async () => {
+    const list = vi.fn(async (_query: { search: string; limit: number }) => ({ portfolios: [{ id: 7, name: "Clients", parentId: null, isPrivate: false }], hasMore: false }));
+    const r = new Resolver(clientWith({ portfolios: { list } }), freshCache());
+    expect(await r.resolve({ kind: "portfolio", value: "Clients" })).toBe(7);
+    expect(await r.resolve({ kind: "portfolio", value: "clients" })).toBe(7);
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledWith({ search: "Clients", limit: 50 });
+  });
+
+  it("forget makes the next resolve reload that kind in that scope", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const r = new Resolver(clientWith({ boards: { list } }), freshCache());
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    r.forget({ kind: "board", scope: { projectId: 1 } });
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("forget on a search kind drops every cached query", async () => {
+    const list = vi.fn(async () => ({ portfolios: [{ id: 7, name: "Clients", parentId: null, isPrivate: false }], hasMore: false }));
+    const r = new Resolver(clientWith({ portfolios: { list } }), freshCache());
+    await r.resolve({ kind: "portfolio", value: "Clients" });
+    r.forget({ kind: "portfolio" });
+    await r.resolve({ kind: "portfolio", value: "Clients" });
+    expect(list).toHaveBeenCalledTimes(2);
+  });
 });

@@ -28,4 +28,16 @@ describe("NameCache", () => {
     await cache.get("projects", load);
     expect(load).toHaveBeenCalledTimes(2);
   });
+  it("invalidatePrefix drops the key itself and every scoped key under it, not look-alikes", async () => {
+    const cache = new NameCache(100000, () => 0);
+    const load = vi.fn(async () => []);
+    await cache.get("boards:1", load);
+    await cache.get("boards:1:x", load);
+    await cache.get("boards:10", load);
+    cache.invalidatePrefix("boards:1");
+    await cache.get("boards:1", load);
+    await cache.get("boards:1:x", load);
+    await cache.get("boards:10", load);
+    expect(load).toHaveBeenCalledTimes(5);
+  });
 });

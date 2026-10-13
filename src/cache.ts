@@ -13,4 +13,11 @@ export class NameCache {
   }
 
   invalidate(key: string): void { this.store.delete(key); }
+
+  /** Drops `prefix` and every key scoped under it (`prefix:…`); `boards:1` does not touch `boards:10`. */
+  invalidatePrefix(prefix: string): void {
+    for (const key of this.store.keys()) {
+      if (key === prefix || key.startsWith(`${prefix}:`)) this.store.delete(key);
+    }
+  }
 }
