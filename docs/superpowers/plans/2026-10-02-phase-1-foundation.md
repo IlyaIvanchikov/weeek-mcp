@@ -135,10 +135,10 @@ Expected: FAIL — `ENOENT … spec/weeek-openapi.json`
 // Then:    npx vitest run tests/contract.test.ts   — fails for every new or removed operation
 //
 // WHEN IT FAILS
-//   "fetch failed" / ENOTFOUND  → DNS. On the office VPN the weeek.net zone is black-holed;
-//                                 fix: resolvectl domain wlo1 IGD_BELTELECOM '~weeek.net' && resolvectl flush-caches
-//                                 (re-run after every Wi-Fi reconnect).
-//   connect timeout on the docs host → the tunnel blocks it; set REFRESH_SPEC_INTERFACE=wlo1
+//   "fetch failed" / ENOTFOUND  → DNS. A VPN resolver may black-hole the weeek.net zone;
+//                                 fix: resolvectl domain <interface> '~weeek.net' && resolvectl flush-caches
+//                                 (find <interface> with `ip route get 1.1.1.1`; re-run after every reconnect).
+//   connect timeout on the docs host → the tunnel blocks it; set REFRESH_SPEC_INTERFACE=<interface>
 //                                 to bind the request past the VPN (curl's --interface; node
 //                                 has no equivalent, so the script shells out to curl then).
 //   "entry script not found" / "spec chunk not found" → the docs app changed its layout.
@@ -215,7 +215,7 @@ console.log(`wrote ${OUT.pathname}: openapi ${document.openapi}, ${Object.keys(d
 In `package.json` `scripts` add `"refresh-spec": "node scripts/refresh-spec.mjs"`.
 Append `spec/` as a new line to both `.mcpbignore` and `.dockerignore`.
 
-Run: `npm run refresh-spec` (add `REFRESH_SPEC_INTERFACE=wlo1` in front if it times out)
+Run: `npm run refresh-spec` (add `REFRESH_SPEC_INTERFACE=<interface>` in front if it times out; see the script header)
 Expected: `wrote …/spec/weeek-openapi.json: openapi 3.1.1, 99 paths, 157 operations, 35 schemas (from weeek.yaml-….js)`
 
 - [ ] **Step 5: Run the test to verify it passes**

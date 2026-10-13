@@ -43,6 +43,11 @@
           "name": "WEEEK_ATTACH_MAX_BYTES",
           "description": "Max attachable file size in bytes (default 10485760)",
           "isRequired": false
+        },
+        {
+          "name": "WEEEK_TOOLSETS",
+          "description": "Comma-separated tool groups to expose, or \"all\" (default tasks)",
+          "isRequired": false
         }
       ]
     }

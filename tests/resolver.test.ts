@@ -2,96 +2,94 @@ import { describe, it, expect, vi } from "vitest";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";
 
-function clientWith(over: Partial<Record<string, any>>) {
-  return over as any; // only the methods used per test are provided
+function clientWith(over: Record<string, any>) {
+  return over as any; // only the resource methods a test needs are provided
 }
 const freshCache = () => new NameCache(100000, () => 0);
+const projects = [{ id: 1, name: "Marketing" }, { id: 2, name: "Sales" }];
 
-describe("Resolver", () => {
-  it("passes a numeric id through without calling the API", async () => {
-    const r = new Resolver(clientWith({}), freshCache());
-    expect(await r.resolveProject(42)).toBe(42);
-    expect(await r.resolveProject("42")).toBe(42);
+describe("Resolver.resolve", () => {
+  it("passes an integer id through without calling the API", async () => {
+    const list = vi.fn();
+    const r = new Resolver(clientWith({ projects: { list } }), freshCache());
+    expect(await r.resolve({ kind: "project", value: 42 })).toBe(42);
+    expect(await r.resolve({ kind: "project", value: "42" })).toBe(42);
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("passes a UUID through for a uuid-shaped kind", async () => {
+    const listMembers = vi.fn();
+    const r = new Resolver(clientWith({ workspace: { listMembers } }), freshCache());
+    const uuid = "a2318d51-46cd-42a9-bab4-554c80824574";
+    expect(await r.resolve({ kind: "member", value: uuid })).toBe(uuid);
+    expect(listMembers).not.toHaveBeenCalled();
+  });
+
+  it("does not treat digits as an id for a uuid-shaped kind", async () => {
+    const listMembers = vi.fn(async () => [{ id: "u1", name: "42" }]);
+    const r = new Resolver(clientWith({ workspace: { listMembers } }), freshCache());
+    expect(await r.resolve({ kind: "member", value: "42" })).toBe("u1");
   });
 
   it("resolves a unique case-insensitive name", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Marketing" }, { id: 2, name: "Sales" }] });
-    const r = new Resolver(client, freshCache());
-    expect(await r.resolveProject("marketing")).toBe(1);
+    const r = new Resolver(clientWith({ projects: { list: async () => projects } }), freshCache());
+    expect(await r.resolve({ kind: "project", value: "marketing" })).toBe(1);
   });
 
   it("throws with candidates when the name is unknown", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Marketing" }] });
-    const r = new Resolver(client, freshCache());
-    await expect(r.resolveProject("Markting")).rejects.toMatchObject({
-      name: "ResolutionError", kind: "project",
-    });
+    const r = new Resolver(clientWith({ projects: { list: async () => projects } }), freshCache());
+    await expect(r.resolve({ kind: "project", value: "Markting" })).rejects.toMatchObject({ name: "ResolutionError", kind: "project" });
   });
 
   it("throws with the duplicates when the name is ambiguous", async () => {
-    const client = clientWith({ listProjects: async () => [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] });
-    const r = new Resolver(client, freshCache());
-    await expect(r.resolveProject("Ops")).rejects.toMatchObject({ name: "ResolutionError" });
+    const r = new Resolver(clientWith({ projects: { list: async () => [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] } }), freshCache());
+    await expect(r.resolve({ kind: "project", value: "Ops" })).rejects.toMatchObject({ name: "ResolutionError", candidates: [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] });
   });
 
-  it("resolves a column across the project's boards", async () => {
+  it("keeps the user-facing label 'assignee' for members", async () => {
+    const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] } }), freshCache());
+    await expect(r.resolve({ kind: "member", value: "Nobody" })).rejects.toThrow(/could not resolve assignee "Nobody"/);
+  });
+
+  it("resolves a board inside its project", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const r = new Resolver(clientWith({ boards: { list } }), freshCache());
+    expect(await r.resolve({ kind: "board", value: "main", scope: { projectId: 1 } })).toBe(10);
+    expect(list).toHaveBeenCalledWith(1);
+  });
+
+  it("refuses to resolve a scoped kind by name without its scope", async () => {
+    const r = new Resolver(clientWith({ boards: { list: async () => [] } }), freshCache());
+    await expect(r.resolve({ kind: "board", value: "Main" })).rejects.toThrow(/needs projectId/);
+  });
+
+  it("resolves a column across all boards of a project", async () => {
     const client = clientWith({
-      listBoards: async (_pid: number) => [{ id: 10, name: "Main" }],
-      listColumns: async (_bid: number) => [{ id: 100, name: "In Progress" }, { id: 101, name: "Done" }],
+      boards: { list: async (_pid: number) => [{ id: 10, name: "A" }, { id: 11, name: "B" }] },
+      columns: { list: async (bid: number) => bid === 10 ? [{ id: 100, name: "To do" }] : [{ id: 110, name: "Done" }] },
     });
     const r = new Resolver(client, freshCache());
-    expect(await r.resolveColumn(1, "in progress")).toBe(100);
+    expect(await r.resolve({ kind: "column", value: "done", scope: { projectId: 1 } })).toBe(110);
   });
 
-  it("resolves a column that only exists on the second board (regression lock)", async () => {
-    const client = clientWith({
-      listBoards: async (_pid: number) => [{ id: 10, name: "Main" }, { id: 20, name: "Secondary" }],
-      listColumns: async (bid: number) =>
-        bid === 10
-          ? [{ id: 100, name: "In Progress" }]
-          : [{ id: 200, name: "Backlog" }],
-    });
-    const r = new Resolver(client, freshCache());
-    expect(await r.resolveColumn(1, "backlog")).toBe(200);
+  it("resolves a column inside one board when boardId is given", async () => {
+    const list = vi.fn(async (_bid: number) => [{ id: 100, name: "In Progress" }]);
+    const r = new Resolver(clientWith({ columns: { list } }), freshCache());
+    expect(await r.resolve({ kind: "column", value: "in progress", scope: { boardId: 10 } })).toBe(100);
+    expect(list).toHaveBeenCalledWith(10);
   });
 
-  it("resolves a column scoped to a specific board", async () => {
-    const listColumns = vi.fn(async (_bid: number) => [
-      { id: 100, name: "In Progress" },
-      { id: 101, name: "Done" },
-    ]);
-    const client = clientWith({ listColumns });
-    const r = new Resolver(client, freshCache());
-    expect(await r.resolveColumnInBoard(10, "done")).toBe(101);
-    expect(listColumns).toHaveBeenCalledWith(10);
+  it("caches a list per kind and scope", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const r = new Resolver(clientWith({ boards: { list } }), freshCache());
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 2 } });
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
-  it("passes a numeric column id through without calling the API (board-scoped)", async () => {
-    const listColumns = vi.fn();
-    const client = clientWith({ listColumns });
-    const r = new Resolver(client, freshCache());
-    expect(await r.resolveColumnInBoard(10, 999)).toBe(999);
-    expect(listColumns).not.toHaveBeenCalled();
-  });
-
-  it("passes a UUID assignee id through without calling the API", async () => {
-    const r = new Resolver(clientWith({}), freshCache());
-    expect(await r.resolveAssignee("550e8400-e29b-41d4-a716-446655440000")).toBe(
-      "550e8400-e29b-41d4-a716-446655440000",
-    );
-  });
-
-  it("resolves an assignee by name to the member's string id", async () => {
-    const client = clientWith({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
-    const r = new Resolver(client, freshCache());
-    expect(await r.resolveAssignee("Ilya")).toBe("u1");
-  });
-
-  it("does not let a hex-looking display name pass through unresolved", async () => {
-    const client = clientWith({ listMembers: async () => [{ id: "u1", name: "Ilya" }] });
-    const r = new Resolver(client, freshCache());
-    await expect(r.resolveAssignee("cafebabe")).rejects.toMatchObject({
-      name: "ResolutionError", kind: "assignee",
-    });
+  it("resolves a member by full name", async () => {
+    const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u9", name: "Ilya I" }] } }), freshCache());
+    expect(await r.resolve({ kind: "member", value: "ilya i" })).toBe("u9");
   });
 });
