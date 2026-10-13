@@ -147,4 +147,34 @@ describe("Resolver.resolve", () => {
     await r.resolve({ kind: "portfolio", value: "Clients" });
     expect(list).toHaveBeenCalledTimes(2);
   });
+
+  it("forget on a scoped kind without a scope does not throw and the next resolve re-reads", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const r = new Resolver(clientWith({ boards: { list } }), freshCache());
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    expect(() => r.forget({ kind: "board" })).not.toThrow();
+    await r.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } });
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("forgetting a column by board also drops the project-wide column aggregate", async () => {
+    const boardsList = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const columnsList = vi.fn(async (_bid: number) => [{ id: 100, name: "Done" }]);
+    const r = new Resolver(clientWith({ boards: { list: boardsList }, columns: { list: columnsList } }), freshCache());
+    await r.resolve({ kind: "column", value: "Done", scope: { projectId: 1 } });
+    r.forget({ kind: "column", scope: { boardId: 10 } });
+    await r.resolve({ kind: "column", value: "Done", scope: { projectId: 1 } });
+    expect(columnsList).toHaveBeenCalledTimes(2);
+  });
+
+  it("forgetting a board drops that project's column aggregate", async () => {
+    const boardsList = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const columnsList = vi.fn(async (_bid: number) => [{ id: 100, name: "Done" }]);
+    const r = new Resolver(clientWith({ boards: { list: boardsList }, columns: { list: columnsList } }), freshCache());
+    await r.resolve({ kind: "column", value: "Done", scope: { projectId: 1 } });
+    r.forget({ kind: "board", scope: { projectId: 1 } });
+    await r.resolve({ kind: "column", value: "Done", scope: { projectId: 1 } });
+    expect(boardsList).toHaveBeenCalledTimes(2);
+    expect(columnsList).toHaveBeenCalledTimes(2);
+  });
 });

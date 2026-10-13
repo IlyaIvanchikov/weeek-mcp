@@ -23,6 +23,11 @@ interface KindBase<Id extends number | string> {
   /** Cache prefix; must include every scope id the load depends on. A search kind caches under `${prefix}:${query}`. */
   cacheKey(scope: ResolveScope): string;
   load(client: WeeekClient, scope: ResolveScope, query: string): Promise<Array<Named<Id>>>;
+  /**
+   * Every cache prefix a write to this kind makes stale. Never throws: a missing scope widens
+   * to the bare prefixes (drop more, re-read once) instead of failing the write that called it.
+   */
+  forgetPrefixes(scope: ResolveScope): string[];
 }
 // The shape names the id type, so a kind cannot declare uuid ids and load numeric ones.
 interface IntegerKind extends KindBase<number> { shape: "integer"; }
@@ -59,11 +64,16 @@ const kinds: KindTable = {
   project: {
     shape: "integer", label: "project", strategy: "list",
     cacheKey: () => "projects",
+    forgetPrefixes: () => ["projects"],
     load: (client) => client.projects.list(),
   },
   board: {
     shape: "integer", label: "board", strategy: "list",
     cacheKey: (scope) => `boards:${requireScope(scope.projectId, "board", "projectId")}`,
+    // The project-wide column aggregate is built from the boards, so a board write dirties it too.
+    forgetPrefixes: ({ projectId }) => projectId !== undefined
+      ? [`boards:${projectId}`, `columns:${projectId}`]
+      : ["boards", "columns"],
     load: (client, scope) => client.boards.list(requireScope(scope.projectId, "board", "projectId")),
   },
   column: {
@@ -71,6 +81,8 @@ const kinds: KindTable = {
     cacheKey: (scope) => scope.boardId !== undefined
       ? `board-columns:${scope.boardId}`
       : `columns:${requireScope(scope.projectId, "column", "boardId or projectId")}`,
+    // A boardId cannot be mapped to its project without a fetch, so both families go entirely.
+    forgetPrefixes: () => ["board-columns", "columns"],
     load: async (client, scope) => {
       if (scope.boardId !== undefined) return client.columns.list(scope.boardId);
       const boards = await client.boards.list(requireScope(scope.projectId, "column", "boardId or projectId"));
@@ -82,17 +94,20 @@ const kinds: KindTable = {
   member: {
     shape: "uuid", label: "assignee", strategy: "list",
     cacheKey: () => "members",
+    forgetPrefixes: () => ["members"],
     load: (client) => client.workspace.listMembers(),
   },
   tag: {
     shape: "integer", label: "tag", strategy: "list",
     cacheKey: () => "tags",
+    forgetPrefixes: () => ["tags"],
     // Tags carry `title`, not `name`; the resolver only ever matches on `name`.
     load: async (client) => (await client.tags.list()).map((tag) => ({ id: tag.id, name: tag.title })),
   },
   portfolio: {
     shape: "integer", label: "portfolio", strategy: "search",
     cacheKey: () => "portfolios",
+    forgetPrefixes: () => ["portfolios"],
     load: async (client, _scope, query) => (await client.portfolios.list({ search: query, limit: searchPageSize })).portfolios,
   },
 };
@@ -121,9 +136,13 @@ export class Resolver {
     return Resolver.pickUnique<IdOf<K>>(definition.label, query, list);
   }
 
-  /** Called by a write tool for every kind its write dirtied, so the next name lookup sees the change. */
+  /**
+   * Called by a write tool for every kind its write dirtied, so the next name lookup re-reads.
+   * Drops every cache family the kind owns (a column drops both its families; a board also drops
+   * its project's column aggregate; a search kind drops every cached query). Never throws.
+   */
   forget({ kind, scope = {} }: ForgetOptions): void {
-    this.cache.invalidatePrefix(kinds[kind].cacheKey(scope));
+    for (const prefix of kinds[kind].forgetPrefixes(scope)) this.cache.invalidatePrefix(prefix);
   }
 
   private static cacheKeyFor(definition: Kind, scope: ResolveScope, query: string): string {
