@@ -372,4 +372,57 @@ describe("task tools", () => {
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toMatch(/too large/);
   });
+
+  it("weeek_list_tasks forwards the Phase 2 filters as the API spells them", async () => {
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
+    await h.get("weeek_list_tasks")!({ all: true, search: "deploy", priority: "high", type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
+    expect(list.mock.calls[0][0]).toMatchObject({ all: 1, search: "deploy", priority: 2, type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
+  });
+
+  it("weeek_list_tasks rejects a priority outside the four names", async () => {
+    const h = harness({ tasks: { list: vi.fn() } });
+    // The harness parses synchronously, so wrap the call to observe the zod rejection.
+    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow();
+  });
+
+  it("create_task sends the priority code, the type and the parent", async () => {
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "Sub", project: "Marketing", priority: "hold", type: "meet", parent: 70 });
+    expect(create).toHaveBeenCalledWith({ title: "Sub", projectId: 1, priority: 3, type: "meet", parentId: 70 });
+  });
+
+  it("update_task resolves tags by name and sends the new fields only when given", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tags: { list: async () => [{ id: 5, title: "Urgent", color: "#f00" }] }, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", 6], priority: "high", type: "call", duration: 90, start: "2026-08-01" });
+    expect(update).toHaveBeenCalledWith(3, { tags: [5, 6], priority: 2, type: "call", duration: 90, startDate: "2026-08-01" });
+  });
+
+  it("weeek_list_boards resolves the project by name", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main", projectId: 1, isPrivate: false }]);
+    const h = harness({ ...baseClient, boards: { list } });
+    const res = await h.get("weeek_list_boards")!({ project: "marketing" });
+    expect(list).toHaveBeenCalledWith(1);
+    expect(JSON.parse(res.content[0].text)).toEqual([{ id: 10, name: "Main", projectId: 1, isPrivate: false }]);
+  });
+
+  it("weeek_list_columns takes a board id, or a board name with its project", async () => {
+    const list = vi.fn(async (_bid: number) => [{ id: 100, name: "Done", boardId: 10 }]);
+    const h = harness({ ...baseClient, columns: { list } });
+    await h.get("weeek_list_columns")!({ board: 10 });
+    expect(list).toHaveBeenLastCalledWith(10);
+    await h.get("weeek_list_columns")!({ board: "main", project: "Marketing" });
+    expect(list).toHaveBeenLastCalledWith(10);
+  });
+
+  it("weeek_list_columns refuses a board name without a project instead of guessing", async () => {
+    const list = vi.fn();
+    const h = harness({ ...baseClient, columns: { list } });
+    const res = await h.get("weeek_list_columns")!({ board: "Main" });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/needs projectId/);
+    expect(list).not.toHaveBeenCalled();
+  });
 });

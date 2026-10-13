@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildServer } from "../src/server.js";
 import { listTools } from "./helpers/list-tools.js";
-import { defaultToolNames } from "./helpers/default-tool-names.js";
+import { defaultToolNames } from "./helpers/tool-names.js";
 import { httpConfig } from "./helpers/http.js";
 import type { Config } from "../src/config.js";
 
