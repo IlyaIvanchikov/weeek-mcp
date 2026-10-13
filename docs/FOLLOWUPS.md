@@ -27,8 +27,9 @@ None of these block v0.1; the create-by-name path is verified sound and token ha
     - Add a `manifest.json` `user_config` entry for `WEEEK_TOOLSETS` once the `projects` toolset exists.
     - Add `tests/api/responses.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.
     - Restore the resolver cases dropped in Phase 1: board-scoped numeric passthrough, UUID trimming, the five-candidate cap, and the `needs … projectId` text for column.
-    - Use OpenAPI's eight methods in `tests/spec.test.ts` and `tests/contract.test.ts`, not the five the server calls today.
+    - ~~Use OpenAPI's eight methods in `tests/spec.test.ts` and `tests/contract.test.ts`, not the five the server calls today.~~ — RESOLVED (Phase 2, Task 1).
     - Typecheck `tests/` in CI (a `tsconfig.tests.json`); tidy the pre-existing `vi.fn()` tuple errors it reports first.
-    - Clear `dist/` before `build`, so a deleted source file cannot leave a stale module in the package.
+    - ~~Clear `dist/` before `build`, so a deleted source file cannot leave a stale module in the package.~~ — RESOLVED (Phase 2, Task 1).
     - `raw: any` → `unknown` in the normalisers.
-    - A type guard instead of `as ToolsetName[]` in `parseToolsets`.
+    - ~~A type guard instead of `as ToolsetName[]` in `parseToolsets`.~~ — RESOLVED (Phase 2, Task 1).
+    - Typecheck `tests/` in CI and `raw: any → unknown` in the normalisers are deferred again: both are mechanical but wide (every fixture and every normaliser), and neither hides a bug. Phase 3 entry list.

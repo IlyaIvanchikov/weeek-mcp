@@ -6,7 +6,9 @@ import { readFileSync } from "node:fs";
 import { listOperations } from "../src/operations.js";
 
 const spec = JSON.parse(readFileSync(new URL("../spec/weeek-openapi.json", import.meta.url), "utf8"));
-const methods = ["get", "post", "put", "patch", "delete"] as const;
+// OpenAPI's full method set, not only the ones the server calls today, so a HEAD or OPTIONS
+// operation appearing in a refreshed spec is counted rather than silently ignored.
+const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"] as const;
 
 const normalise = (method: string, path: string) => `${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
 
