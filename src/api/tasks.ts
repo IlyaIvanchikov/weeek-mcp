@@ -3,7 +3,7 @@ import { operations } from "../operations.js";
 import { pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
-import type { Attachment, CommentsPage, NewTask, TaskComment, TaskLocation, TaskType, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
+import type { Attachment, CommentsPage, NewTask, SuccessResponse, TaskComment, TaskLocation, TaskType, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -105,8 +105,8 @@ export class TasksApi {
     return toTask(json.task);
   }
 
-  async remove(id: number): Promise<{ success: boolean }> {
-    return this.http.execute<{ success: boolean }>(ops.remove, { params: { taskId: id } });
+  async remove(id: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.remove, { params: { taskId: id } });
   }
 
   async setCompleted({ taskId, completed }: SetCompletedOptions): Promise<WeeekTask> {
@@ -187,12 +187,12 @@ export class TasksApi {
     return this.get(taskId);
   }
 
-  async startTimer(taskId: number): Promise<{ success: boolean }> {
-    return this.http.execute<{ success: boolean }>(ops.startTimer, { params: { taskId } });
+  async startTimer(taskId: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.startTimer, { params: { taskId } });
   }
 
-  async stopTimer(taskId: number): Promise<{ success: boolean }> {
-    return this.http.execute<{ success: boolean }>(ops.stopTimer, { params: { taskId } });
+  async stopTimer(taskId: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.stopTimer, { params: { taskId } });
   }
 
   async addTimeEntry({ taskId, entry }: AddTimeEntryOptions): Promise<TimeEntry> {
@@ -205,7 +205,7 @@ export class TasksApi {
     return toTimeEntry(json.data);
   }
 
-  async removeTimeEntry({ taskId, timeEntryId }: TimeEntryRef): Promise<{ success: boolean }> {
-    return this.http.execute<{ success: boolean }>(ops.removeTimeEntry, { params: { taskId, timeEntryId } });
+  async removeTimeEntry({ taskId, timeEntryId }: TimeEntryRef): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.removeTimeEntry, { params: { taskId, timeEntryId } });
   }
 }

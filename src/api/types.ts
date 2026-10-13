@@ -1,7 +1,9 @@
 import type { BinaryResponse } from "../http.js";
-import type { attachmentServices, taskPriorities, taskTypes } from "./constants.js";
+import type { attachmentServices, projectStatuses, taskPriorities, taskTypes } from "./constants.js";
 
-export interface NamedEntity { id: number; name: string; }
+/** What an endpoint answers when it returns no entity, only the success flag. */
+export interface SuccessResponse { success: boolean; }
+
 export interface Member { id: string; name: string; }
 
 export type AttachmentService = (typeof attachmentServices)[number];
@@ -75,3 +77,21 @@ export interface NewTask {
   type?: TaskType;
   parentId?: number;
 }
+
+export type ProjectStatus = (typeof projectStatuses)[number];
+
+export interface Project {
+  id: number; name: string; description: string | null; color: string | null;
+  status: ProjectStatus | null; isPrivate: boolean; portfolioId: number | null;
+  /** Member ids. */
+  team: string[];
+}
+export interface NewProject { name: string; isPrivate: boolean; description?: string; portfolioId?: number; }
+/** PUT /tm/projects/{id} replaces: the API requires name and isPrivate even when unchanged. */
+export interface ProjectUpdate { name: string; isPrivate: boolean; color?: string; }
+
+export interface Board { id: number; name: string; projectId: number; isPrivate: boolean; }
+export interface NewBoard { name: string; projectId: number; }
+
+export interface BoardColumn { id: number; name: string; boardId: number; }
+export interface NewColumn { name: string; boardId: number; }

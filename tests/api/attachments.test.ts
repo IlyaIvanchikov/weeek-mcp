@@ -64,4 +64,10 @@ describe("AttachmentsApi", () => {
     await expect(new AttachmentsApi(httpWith(f)).download({ attachment: weeekFile(), maxBytes: 1024 }))
       .rejects.toThrow(/attachment a1.*could not reach/s);
   });
+
+  it("download refuses an attachment whose url does not parse", async () => {
+    const f = binaryFetch(200, new Uint8Array([1]), "image/png");
+    await expect(new AttachmentsApi(httpWith(f)).download({ attachment: weeekFile({ url: "not a url" }), maxBytes: 1024 })).rejects.toThrow(/unusable url/);
+    expect(f).not.toHaveBeenCalled();
+  });
 });

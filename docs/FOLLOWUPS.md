@@ -25,7 +25,7 @@ None of these block v0.1; the create-by-name path is verified sound and token ha
 20. **Phase 2 entry list from the Phase 1 review** — do these before or alongside the first Phase 2 toolset:
     - Tie `Kind.shape` to the id type (`IntegerKind | UuidKind`) before the first new kind, so a kind cannot declare a `uuid` shape with numeric ids.
     - Add a `manifest.json` `user_config` entry for `WEEEK_TOOLSETS` once the `projects` toolset exists.
-    - Add `tests/api/responses.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.
+    - ~~Add `tests/api/responses.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.~~ — RESOLVED (Phase 2, Task 5): tests/api/responses.test.ts; the "unusable url" guard test was added to tests/api/attachments.test.ts.
     - Restore the resolver cases dropped in Phase 1: board-scoped numeric passthrough, UUID trimming, the five-candidate cap, and the `needs … projectId` text for column.
     - ~~Use OpenAPI's eight methods in `tests/spec.test.ts` and `tests/contract.test.ts`, not the five the server calls today.~~ — RESOLVED (Phase 2, Task 1).
     - Typecheck `tests/` in CI (a `tsconfig.tests.json`); tidy the pre-existing `vi.fn()` tuple errors it reports first.
