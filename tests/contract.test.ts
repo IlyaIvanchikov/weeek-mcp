@@ -22,22 +22,6 @@ const registered = new Set(listOperations().map((o) => normalise(o.method, o.pat
 // its phase lands; delete the constant in Phase 4. An operation in BOTH this list and the
 // registry fails the test below, so the list cannot rot.
 const notYetImplemented: string[] = [
-  // ── Phase 2 · task manager ──────────────────────────────────────────────
-  "GET /user/me",
-  "GET /ws",
-  "GET /ws/tags", "POST /ws/tags", "GET /ws/tags/{}", "PUT /ws/tags/{}", "DELETE /ws/tags/{}",
-  "GET /tm/portfolios", "POST /tm/portfolios", "GET /tm/portfolios/{}", "PUT /tm/portfolios/{}", "DELETE /tm/portfolios/{}",
-  "POST /tm/projects", "GET /tm/projects/{}", "PUT /tm/projects/{}", "DELETE /tm/projects/{}",
-  "POST /tm/projects/{}/archive", "POST /tm/projects/{}/un-archive",
-  "POST /tm/boards", "PUT /tm/boards/{}", "DELETE /tm/boards/{}", "POST /tm/boards/{}/move",
-  "POST /tm/board-columns", "PUT /tm/board-columns/{}", "DELETE /tm/board-columns/{}", "POST /tm/board-columns/{}/move",
-  "POST /tm/tasks/{}/locations", "DELETE /tm/tasks/{}/locations",
-  "POST /tm/tasks/{}/watchers", "DELETE /tm/tasks/{}/watchers",
-  "POST /tm/tasks/{}/start-timer", "POST /tm/tasks/{}/stop-timer",
-  "POST /tm/tasks/{}/time-entries", "PUT /tm/tasks/{}/time-entries/{}", "DELETE /tm/tasks/{}/time-entries/{}",
-  "POST /tm/tasks/{}/assignees", "DELETE /tm/tasks/{}/assignees",
-  "POST /tm/tasks/{}/parent",
-  "GET /tm/tasks/{}/comments", "POST /tm/tasks/{}/comments", "DELETE /tm/tasks/{}/comments/{}",
   // ── Phase 3 · custom fields (global, project, board, funnel) ────────────
   "GET /tm/custom-fields", "POST /tm/custom-fields", "PUT /tm/custom-fields/{}", "DELETE /tm/custom-fields/{}",
   "POST /tm/custom-fields/{}/transfer-to-project", "POST /tm/custom-fields/{}/transfer-to-board",
