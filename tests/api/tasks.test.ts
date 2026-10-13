@@ -1,25 +1,42 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { TasksApi } from "../../src/api/tasks.js";
 import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
-const rawTask = { id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"], dueDate: "2026-07-22", isCompleted: false };
+const rawTask = {
+  id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
+  assignees: ["a2318d51-uuid"], dueDate: "2026-07-22", isCompleted: false,
+  parentId: null, priority: 2, type: "action", subscribers: ["u7"], tags: [5], subTasks: [80],
+  locations: [{ projectId: 2, boardId: 3, boardColumnId: 8 }],
+  timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
+  authorId: "u1", createdAt: "2026-07-01T10:00:00Z", startDate: "2026-07-20", duration: 60,
+};
+// The same task after toTask: what every tool returns to the model.
+const normalisedTask = {
+  id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
+  parentId: null, subTasks: [80], assignees: ["a2318d51-uuid"], watchers: ["u7"], authorId: "u1",
+  priority: "high", type: "action", startDate: "2026-07-20", dueDate: "2026-07-22",
+  completed: false, completedAt: null, createdAt: "2026-07-01T10:00:00Z", duration: 60, tags: [5],
+  locations: [{ projectId: 2, boardId: 3, boardColumnId: 8 }],
+  timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
+  attachments: [],
+};
 
 describe("TasksApi", () => {
   it("list GETs /tm/tasks with the query and normalises each task", async () => {
     const f = jsonFetch(200, { success: true, tasks: [rawTask] });
     const out = await new TasksApi(httpWith(f)).list({ projectId: 2, perPage: 20 });
-    expect(out).toEqual([{ id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8, assignees: ["a2318d51-uuid"], dueDate: "2026-07-22", completed: false, attachments: [] }]);
+    expect(out).toEqual([normalisedTask]);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks?projectId=2&perPage=20");
   });
 
   it("create POSTs title + locations and optional fields only when given", async () => {
     const f = jsonFetch(200, { success: true, task: { ...rawTask, id: 5 } });
-    const t = await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, boardColumnId: 2, userId: "u1", dayFrom: "2026-08-01" });
+    const t = await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, boardColumnId: 2, userId: "u1", dayFrom: "2026-08-01", priority: 2, type: "call", parentId: 70 });
     expect(t.id).toBe(5);
     const { url, init, json } = sent(f);
     expect(url).toBe("https://api.weeek.net/public/v1/tm/tasks");
     expect(init.method).toBe("POST");
-    expect(json()).toEqual({ title: "T", locations: [{ projectId: 1, boardColumnId: 2 }], userId: "u1", dayFrom: "2026-08-01" });
+    expect(json()).toEqual({ title: "T", locations: [{ projectId: 1, boardColumnId: 2 }], userId: "u1", dayFrom: "2026-08-01", priority: 2, type: "call", parentId: 70 });
   });
 
   it("get surfaces assignees, boardId, dueDate and attachments", async () => {
@@ -37,6 +54,14 @@ describe("TasksApi", () => {
     expect(t.assignees).toEqual([]);
     expect(t.attachments).toEqual([]);
     expect(t.boardId).toBeNull();
+    expect(t.watchers).toEqual([]);
+    expect(t.tags).toEqual([]);
+    expect(t.subTasks).toEqual([]);
+    expect(t.locations).toEqual([]);
+    expect(t.timeEntries).toEqual([]);
+    expect(t.priority).toBeNull();
+    expect(t.type).toBeNull();
+    expect(t.parentId).toBeNull();
   });
 
   it("update PUTs the patch", async () => {
@@ -88,5 +113,75 @@ describe("TasksApi", () => {
     expect(init.headers).not.toHaveProperty("content-type");
     const list = jsonFetch(200, { success: true, data: [att] });
     expect(await new TasksApi(httpWith(list)).uploadAttachment({ taskId: 7, filename: "f.md", bytes: new Uint8Array([1]) })).toEqual([att]);
+  });
+
+  it("listComments GETs the page and normalises comments", async () => {
+    const raw = { id: 9, parentId: null, authorId: "u1", markdown: "hi", createdAt: "2026-07-01T10:00:00Z", updatedAt: "2026-07-01T10:00:00Z" };
+    const f = jsonFetch(200, { comments: [raw], hasMore: true });
+    expect(await new TasksApi(httpWith(f)).listComments({ taskId: 78, limit: 10, offset: 20 })).toEqual({ comments: [raw], hasMore: true });
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/comments?limit=10&offset=20");
+  });
+
+  it("addComment POSTs markdown and only sends parentId when replying", async () => {
+    const raw = { id: 10, parentId: 9, authorId: "u1", markdown: "re", createdAt: "x", updatedAt: "x" };
+    const f = jsonFetch(200, { comment: raw });
+    expect(await new TasksApi(httpWith(f)).addComment({ taskId: 78, markdown: "re", parentId: 9 })).toEqual(raw);
+    expect(sent(f).json()).toEqual({ markdown: "re", parentId: 9 });
+    const g = jsonFetch(200, { comment: { ...raw, parentId: null } });
+    await new TasksApi(httpWith(g)).addComment({ taskId: 78, markdown: "top" });
+    expect(sent(g).json()).toEqual({ markdown: "top" });
+  });
+
+  it("removeComment DELETEs and accepts an empty 204 body", async () => {
+    const f = vi.fn(async () => new Response(null, { status: 204 }));
+    await expect(new TasksApi(httpWith(f)).removeComment({ taskId: 78, commentId: 9 })).resolves.toBeUndefined();
+    expect(sent(f).init.method).toBe("DELETE");
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/comments/9");
+  });
+
+  it.each([
+    ["addAssignees", "POST", "assignees", "assignees"],
+    ["removeAssignees", "DELETE", "assignees", "assignees"],
+    ["addWatchers", "POST", "watchers", "watchers"],
+    ["removeWatchers", "DELETE", "watchers", "watchers"],
+  ] as const)("%s sends %s /%s with the member ids, then re-reads the task", async (method, verb, segment, bodyKey) => {
+    const f = jsonFetch(200, { success: true, task: rawTask });
+    const t = await new TasksApi(httpWith(f))[method]({ taskId: 78, memberIds: ["u1", "u2"] });
+    expect(t).toEqual(normalisedTask);
+    expect(sent(f, 0).init.method).toBe(verb);
+    expect(sent(f, 0).url).toBe(`https://api.weeek.net/public/v1/tm/tasks/78/${segment}`);
+    expect(sent(f, 0).json()).toEqual({ [bodyKey]: ["u1", "u2"] });
+    expect(sent(f, 1).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
+  });
+
+  it("addLocation POSTs the project and the column only when given; the API answers 204", async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, task: rawTask }), { status: 200 }));
+    await new TasksApi(httpWith(f)).addLocation({ taskId: 78, projectId: 4 });
+    expect(sent(f, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/locations");
+    expect(sent(f, 0).json()).toEqual({ projectId: 4 });
+    const g = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(g)).addLocation({ taskId: 78, projectId: 4, boardColumnId: 12 });
+    expect(sent(g, 0).json()).toEqual({ projectId: 4, boardColumnId: 12 });
+  });
+
+  it("removeLocation DELETEs with the project in the body", async () => {
+    const f = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(f)).removeLocation({ taskId: 78, projectId: 4 });
+    expect(sent(f, 0).init.method).toBe("DELETE");
+    expect(sent(f, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/locations");
+    expect(sent(f, 0).json()).toEqual({ projectId: 4 });
+  });
+
+  it("setParent sends parentId, including an explicit null to detach", async () => {
+    const f = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(f)).setParent({ taskId: 80, parentId: 78 });
+    expect(sent(f, 0).url).toBe("https://api.weeek.net/public/v1/tm/tasks/80/parent");
+    expect(sent(f, 0).json()).toEqual({ parentId: 78 });
+    const g = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(g)).setParent({ taskId: 80, parentId: null });
+    expect(sent(g, 0).json()).toEqual({ parentId: null });
+    expect(Object.keys(sent(g, 0).json())).toContain("parentId");
   });
 });

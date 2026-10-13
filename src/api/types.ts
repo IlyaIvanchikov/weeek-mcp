@@ -1,5 +1,5 @@
 import type { BinaryResponse } from "../http.js";
-import type { attachmentServices } from "./constants.js";
+import type { attachmentServices, taskPriorities, taskTypes } from "./constants.js";
 
 export interface NamedEntity { id: number; name: string; }
 export interface Member { id: string; name: string; }
@@ -22,14 +22,53 @@ export interface Attachment {
 export type AttachmentBytes = BinaryResponse;
 export interface DownloadAttachmentOptions { attachment: Attachment; maxBytes: number; }
 
+export type TaskPriority = (typeof taskPriorities)[number];
+export type TaskType = (typeof taskTypes)[number];
+
+export interface TaskLocation { projectId: number; boardId: number | null; boardColumnId: number | null; }
+
+export interface TimeEntry {
+  id: string;
+  userId: string;
+  /** `Y-m-d`. */
+  date: string;
+  /** Minutes; the API caps it at 1440. */
+  duration: number;
+  isOvertime: boolean;
+  comment: string;
+}
+
+export interface TaskComment {
+  id: number;
+  parentId: number | null;
+  authorId: string;
+  markdown: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface CommentsPage { comments: TaskComment[]; hasMore: boolean; }
+
 export interface WeeekTask {
   id: number; title: string; description: string | null;
   projectId: number | null; boardId: number | null; boardColumnId: number | null;
-  assignees: string[]; dueDate: string | null; completed: boolean;
+  parentId: number | null; subTasks: number[];
+  assignees: string[]; watchers: string[]; authorId: string | null;
+  priority: TaskPriority | null; type: TaskType | null;
+  startDate: string | null; dueDate: string | null;
+  completed: boolean; completedAt: string | null; createdAt: string | null;
+  /** Time estimate, in minutes. */
+  duration: number | null;
+  tags: number[];
+  locations: TaskLocation[];
+  timeEntries: TimeEntry[];
   attachments: Attachment[];
 }
 
 export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
+  /** Wire code; use priorityCode() to build it from a name. */
+  priority?: number;
+  type?: TaskType;
+  parentId?: number;
 }
