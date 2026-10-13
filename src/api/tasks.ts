@@ -3,7 +3,7 @@ import { operations } from "../operations.js";
 import { pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
-import type { Attachment, CommentsPage, NewTask, TaskComment, TaskLocation, TaskType, TimeEntry, WeeekTask } from "./types.js";
+import type { Attachment, CommentsPage, NewTask, TaskComment, TaskLocation, TaskType, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -15,6 +15,9 @@ export interface TaskMembersOptions { taskId: number; memberIds: string[]; }
 export interface AddLocationOptions { taskId: number; projectId: number; boardColumnId?: number; }
 export interface RemoveLocationOptions { taskId: number; projectId: number; }
 export interface SetParentOptions { taskId: number; parentId: number | null; }
+export interface AddTimeEntryOptions { taskId: number; entry: TimeEntryFields; }
+export interface UpdateTimeEntryOptions { taskId: number; timeEntryId: string; entry: TimeEntryFields; }
+export interface TimeEntryRef { taskId: number; timeEntryId: string; }
 
 const ops = operations.tasks;
 
@@ -182,5 +185,27 @@ export class TasksApi {
     // parentId: null is how the API detaches a subtask, so the key is always sent.
     await this.http.execute(ops.setParent, { params: { taskId }, body: { parentId } });
     return this.get(taskId);
+  }
+
+  async startTimer(taskId: number): Promise<{ success: boolean }> {
+    return this.http.execute<{ success: boolean }>(ops.startTimer, { params: { taskId } });
+  }
+
+  async stopTimer(taskId: number): Promise<{ success: boolean }> {
+    return this.http.execute<{ success: boolean }>(ops.stopTimer, { params: { taskId } });
+  }
+
+  async addTimeEntry({ taskId, entry }: AddTimeEntryOptions): Promise<TimeEntry> {
+    const json = await this.http.execute<{ data: unknown }>(ops.addTimeEntry, { params: { taskId }, body: entry });
+    return toTimeEntry(json.data);
+  }
+
+  async updateTimeEntry({ taskId, timeEntryId, entry }: UpdateTimeEntryOptions): Promise<TimeEntry> {
+    const json = await this.http.execute<{ data: unknown }>(ops.updateTimeEntry, { params: { taskId, timeEntryId }, body: entry });
+    return toTimeEntry(json.data);
+  }
+
+  async removeTimeEntry({ taskId, timeEntryId }: TimeEntryRef): Promise<{ success: boolean }> {
+    return this.http.execute<{ success: boolean }>(ops.removeTimeEntry, { params: { taskId, timeEntryId } });
   }
 }

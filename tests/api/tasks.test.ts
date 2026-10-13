@@ -184,4 +184,37 @@ describe("TasksApi", () => {
     expect(sent(g, 0).json()).toEqual({ parentId: null });
     expect(Object.keys(sent(g, 0).json())).toContain("parentId");
   });
+
+  it.each([["startTimer", "start-timer"], ["stopTimer", "stop-timer"]] as const)("%s POSTs /%s and returns the envelope", async (method, segment) => {
+    const f = jsonFetch(200, { success: true });
+    expect(await new TasksApi(httpWith(f))[method](78)).toEqual({ success: true });
+    expect(sent(f).init.method).toBe("POST");
+    expect(sent(f).url).toBe(`https://api.weeek.net/public/v1/tm/tasks/78/${segment}`);
+  });
+
+  const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
+  const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
+  const entry = { id: "te9", ...entryFields, comment: "" };
+
+  it("addTimeEntry POSTs the four fields and returns the entry", async () => {
+    const f = jsonFetch(200, { success: true, data: rawEntry });
+    expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(entry);
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries");
+    expect(sent(f).json()).toEqual(entryFields);
+  });
+
+  it("updateTimeEntry PUTs the four fields to the entry's path", async () => {
+    const f = jsonFetch(200, { success: true, data: rawEntry });
+    expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(entry);
+    expect(sent(f).init.method).toBe("PUT");
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
+    expect(sent(f).json()).toEqual(entryFields);
+  });
+
+  it("removeTimeEntry DELETEs the entry's path", async () => {
+    const f = jsonFetch(200, { success: true });
+    expect(await new TasksApi(httpWith(f)).removeTimeEntry({ taskId: 78, timeEntryId: "te9" })).toEqual({ success: true });
+    expect(sent(f).init.method).toBe("DELETE");
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
+  });
 });

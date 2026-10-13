@@ -38,6 +38,9 @@ export interface TimeEntry {
   comment: string;
 }
 
+/** What the API needs to record time: a PUT replaces all four, so an update sends all four too. */
+export interface TimeEntryFields { userId: string; date: string; duration: number; isOvertime: boolean; }
+
 export interface TaskComment {
   id: number;
   parentId: number | null;
