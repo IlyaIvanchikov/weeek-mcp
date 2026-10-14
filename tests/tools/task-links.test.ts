@@ -28,7 +28,7 @@ describe("task link tools", () => {
   ])("%s needs confirm:true, then detaches", async (tool, field, method) => {
     const fn = vi.fn(async () => task);
     const h = toolHarness(registerTaskLinkTools, { ...client(), tasks: { [method]: fn } });
-    expect(() => h.call(tool, { id: 78, [field]: ["Ann"] })).toThrow();
+    expect(() => h.call(tool, { id: 78, [field]: ["Ann"] })).toThrow(/confirm/);
     expect(fn).not.toHaveBeenCalled();
     await h.call(tool, { id: 78, [field]: ["Ann"], confirm: true });
     expect(fn).toHaveBeenCalledWith({ taskId: 78, memberIds: [ann.id] });
@@ -39,7 +39,7 @@ describe("task link tools", () => {
     const h = toolHarness(registerTaskLinkTools, { ...client(), tasks: { addAssignees } });
     const res = await h.call("weeek_add_assignees", { id: 78, assignees: ["Nobody"] });
     expect(res.isError).toBe(true);
-    expect(reply(res)).toMatchObject({ error: expect.stringMatching(/could not resolve assignee "Nobody"/), candidates: [] });
+    expect(reply(res)).toMatchObject({ error: expect.stringMatching(/could not resolve member "Nobody"/), candidates: [] });
     expect(addAssignees).not.toHaveBeenCalled();
   });
 
@@ -55,7 +55,8 @@ describe("task link tools", () => {
   it("weeek_remove_task_from_project needs confirm:true", async () => {
     const removeLocation = vi.fn(async () => task);
     const h = toolHarness(registerTaskLinkTools, { ...client(), tasks: { removeLocation } });
-    expect(() => h.call("weeek_remove_task_from_project", { id: 78, project: 2 })).toThrow();
+    expect(() => h.call("weeek_remove_task_from_project", { id: 78, project: 2 })).toThrow(/confirm/);
+    expect(removeLocation).not.toHaveBeenCalled();
     await h.call("weeek_remove_task_from_project", { id: 78, project: 2, confirm: true });
     expect(removeLocation).toHaveBeenCalledWith({ taskId: 78, projectId: 2 });
   });

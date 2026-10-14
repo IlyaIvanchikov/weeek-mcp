@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { taskPriorities } from "../../src/api/constants.js";
 import { priorityCode, priorityName } from "../../src/api/priority.js";
 
 describe("task priority codes", () => {
   it("round-trips every name through its wire code", () => {
-    for (const [code, name] of ["low", "medium", "high", "hold"].entries()) {
-      expect(priorityCode(name as "low")).toBe(code);
+    for (const [code, name] of taskPriorities.entries()) {
+      expect(priorityCode(name)).toBe(code);
       expect(priorityName(code)).toBe(name);
     }
   });

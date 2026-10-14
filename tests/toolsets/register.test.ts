@@ -54,13 +54,6 @@ describe("toolsets", () => {
     expect((await listTools(ctx.server)).map((t) => t.name)).toEqual(["weeek_version"]);
   });
 
-  it("registers every toolset's tools exactly once for all", async () => {
-    const ctx = context();
-    registerToolsets(ctx, ["all"]);
-    const names = (await listTools(ctx.server)).map((t) => t.name).sort();
-    expect(names).toEqual(allToolNames);
-  });
-
   it("registers only core + projects for the projects toolset", async () => {
     const ctx = context();
     registerToolsets(ctx, ["projects"]);

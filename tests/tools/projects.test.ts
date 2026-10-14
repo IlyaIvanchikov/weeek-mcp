@@ -133,7 +133,7 @@ describe("project tools", () => {
     const h = toolHarness(registerProjectTools, { ...c, columns: { ...c.columns, update } });
     const res = await h.call("weeek_update_column", { column: "Done", name: "Shipped" });
     expect(res.isError).toBe(true);
-    expect(reply(res).error).toMatch(/needs boardId or projectId/);
+    expect(reply(res).error).toMatch(/needs a board or a project \(name or id\)/);
     expect(update).not.toHaveBeenCalled();
   });
 
@@ -155,5 +155,27 @@ describe("project tools", () => {
     expect(move).toHaveBeenCalledWith({ columnId: 100, upperColumnId: 101 });
     await h.call("weeek_move_column", { column: 100, after: null });
     expect(move).toHaveBeenLastCalledWith({ columnId: 100, upperColumnId: null });
+  });
+
+  const ok = async () => ({ success: true });
+  describe.each([
+    { tool: "weeek_update_project", args: { project: "Marketing", name: "Mkt" }, stubs: { projects: { update: ok } }, warm: { kind: "project", value: "Marketing" }, list: "projects" },
+    { tool: "weeek_archive_project", args: { project: "Marketing", confirm: true }, stubs: { projects: { setArchived: ok } }, warm: { kind: "project", value: "Marketing" }, list: "projects" },
+    { tool: "weeek_update_board", args: { board: "Main", project: 1, name: "Renamed" }, stubs: { boards: { update: ok } }, warm: { kind: "board", value: "Main", scope: { projectId: 1 } }, list: "boards" },
+    { tool: "weeek_delete_board", args: { board: "Main", project: 1, confirm: true }, stubs: { boards: { remove: ok } }, warm: { kind: "board", value: "Main", scope: { projectId: 1 } }, list: "boards" },
+    { tool: "weeek_update_column", args: { column: "To do", board: 10, name: "Renamed" }, stubs: { columns: { update: ok } }, warm: { kind: "column", value: "To do", scope: { boardId: 10 } }, list: "columns" },
+    { tool: "weeek_delete_column", args: { column: "To do", board: 10, confirm: true }, stubs: { columns: { remove: ok } }, warm: { kind: "column", value: "To do", scope: { boardId: 10 } }, list: "columns" },
+  ] as const)("$tool forgets what it changed", ({ tool, args, stubs, warm, list }) => {
+    it("so the next lookup by name loads the list again", async () => {
+      const c = client();
+      const h = toolHarness(registerProjectTools, {
+        ...c,
+        ...Object.fromEntries(Object.entries(stubs).map(([group, methods]) => [group, { ...(c as any)[group], ...methods }])),
+      });
+      await h.resolver.resolve(warm as any); // warms the cache
+      await h.call(tool, args);
+      await h.resolver.resolve(warm as any);
+      expect(c[list].list).toHaveBeenCalledTimes(2);
+    });
   });
 });
