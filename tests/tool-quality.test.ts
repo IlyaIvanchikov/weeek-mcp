@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { buildServer } from "../src/server.js";
 import { listTools } from "./helpers/list-tools.js";
 import { httpConfig } from "./helpers/http.js";
+import { allToolNames } from "./helpers/tool-names.js";
 
 type Tool = Awaited<ReturnType<typeof listTools>>[number];
 let tools: Tool[] = [];
@@ -21,8 +22,8 @@ const requiresConfirm = (t: Tool) => Array.isArray(t.inputSchema.required) && t.
 const isDestructive = (t: Tool) => t.annotations?.destructiveHint === true;
 
 describe("tool quality", () => {
-  it("has at least the default surface", () => {
-    expect(tools.length).toBeGreaterThanOrEqual(13);
+  it("registers exactly the documented surface for all", () => {
+    expect(tools.map((t) => t.name).sort()).toEqual(allToolNames);
   });
 
   it("names every tool weeek_<verb>_<noun>", () => {
@@ -38,6 +39,12 @@ describe("tool quality", () => {
   it("gates every tool that declares destructiveHint behind confirm:true", () => {
     const unguarded = tools.filter((t) => isDestructive(t) && !requiresConfirm(t)).map((t) => t.name);
     expect(unguarded).toEqual([]);
+  });
+
+  it("gates every tool whose name says it detaches or deletes, by name list", () => {
+    const expected = allToolNames.filter((n) => destructiveName.test(n));
+    const gated = tools.filter((t) => isDestructive(t) && requiresConfirm(t)).map((t) => t.name).sort();
+    expect(gated).toEqual(expected);
   });
 
   it("gives every tool a description that says something and stays readable", () => {

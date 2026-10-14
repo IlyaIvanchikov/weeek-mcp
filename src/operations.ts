@@ -15,17 +15,49 @@ export interface Operation {
 }
 
 export const operations = {
+  user: {
+    me: { method: "GET", path: "/user/me" },
+  },
   workspace: {
+    get: { method: "GET", path: "/ws" },
     listMembers: { method: "GET", path: "/ws/members" },
+  },
+  tags: {
+    list: { method: "GET", path: "/ws/tags" },
+    create: { method: "POST", path: "/ws/tags" },
+    get: { method: "GET", path: "/ws/tags/{tagId}" },
+    update: { method: "PUT", path: "/ws/tags/{tagId}" },
+    remove: { method: "DELETE", path: "/ws/tags/{tagId}" },
+  },
+  portfolios: {
+    list: { method: "GET", path: "/tm/portfolios" },
+    create: { method: "POST", path: "/tm/portfolios" },
+    get: { method: "GET", path: "/tm/portfolios/{portfolioId}" },
+    update: { method: "PUT", path: "/tm/portfolios/{portfolioId}" },
+    remove: { method: "DELETE", path: "/tm/portfolios/{portfolioId}" },
   },
   projects: {
     list: { method: "GET", path: "/tm/projects" },
+    create: { method: "POST", path: "/tm/projects" },
+    get: { method: "GET", path: "/tm/projects/{projectId}" },
+    update: { method: "PUT", path: "/tm/projects/{projectId}" },
+    remove: { method: "DELETE", path: "/tm/projects/{projectId}" },
+    archive: { method: "POST", path: "/tm/projects/{projectId}/archive" },
+    unarchive: { method: "POST", path: "/tm/projects/{projectId}/un-archive" },
   },
   boards: {
     list: { method: "GET", path: "/tm/boards" },
+    create: { method: "POST", path: "/tm/boards" },
+    update: { method: "PUT", path: "/tm/boards/{boardId}" },
+    remove: { method: "DELETE", path: "/tm/boards/{boardId}" },
+    move: { method: "POST", path: "/tm/boards/{boardId}/move" },
   },
   columns: {
     list: { method: "GET", path: "/tm/board-columns" },
+    create: { method: "POST", path: "/tm/board-columns" },
+    update: { method: "PUT", path: "/tm/board-columns/{columnId}" },
+    remove: { method: "DELETE", path: "/tm/board-columns/{columnId}" },
+    move: { method: "POST", path: "/tm/board-columns/{columnId}/move" },
   },
   tasks: {
     list: { method: "GET", path: "/tm/tasks" },
@@ -38,6 +70,21 @@ export const operations = {
     changeBoard: { method: "POST", path: "/tm/tasks/{taskId}/board" },
     changeColumn: { method: "POST", path: "/tm/tasks/{taskId}/board-column" },
     uploadAttachment: { method: "POST", path: "/tm/tasks/{taskId}/attachments" },
+    addLocation: { method: "POST", path: "/tm/tasks/{taskId}/locations" },
+    removeLocation: { method: "DELETE", path: "/tm/tasks/{taskId}/locations" },
+    addWatchers: { method: "POST", path: "/tm/tasks/{taskId}/watchers" },
+    removeWatchers: { method: "DELETE", path: "/tm/tasks/{taskId}/watchers" },
+    startTimer: { method: "POST", path: "/tm/tasks/{taskId}/start-timer" },
+    stopTimer: { method: "POST", path: "/tm/tasks/{taskId}/stop-timer" },
+    addTimeEntry: { method: "POST", path: "/tm/tasks/{taskId}/time-entries" },
+    updateTimeEntry: { method: "PUT", path: "/tm/tasks/{taskId}/time-entries/{timeEntryId}" },
+    removeTimeEntry: { method: "DELETE", path: "/tm/tasks/{taskId}/time-entries/{timeEntryId}" },
+    addAssignees: { method: "POST", path: "/tm/tasks/{taskId}/assignees" },
+    removeAssignees: { method: "DELETE", path: "/tm/tasks/{taskId}/assignees" },
+    setParent: { method: "POST", path: "/tm/tasks/{taskId}/parent" },
+    listComments: { method: "GET", path: "/tm/tasks/{taskId}/comments" },
+    addComment: { method: "POST", path: "/tm/tasks/{taskId}/comments" },
+    removeComment: { method: "DELETE", path: "/tm/tasks/{taskId}/comments/{commentId}" },
   },
   attachments: {
     get: { method: "GET", path: "/ws/attachments/{fileId}" },

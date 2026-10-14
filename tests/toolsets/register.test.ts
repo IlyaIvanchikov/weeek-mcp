@@ -7,7 +7,7 @@ import { WeeekClient } from "../../src/client.js";
 import { Resolver } from "../../src/resolver.js";
 import { NameCache } from "../../src/cache.js";
 import { listTools } from "../helpers/list-tools.js";
-import { defaultToolNames } from "../helpers/default-tool-names.js";
+import { allToolNames, defaultToolNames, projectToolNames, timeToolNames } from "../helpers/tool-names.js";
 import { httpConfig } from "../helpers/http.js";
 
 function context(): ToolContext {
@@ -28,8 +28,9 @@ describe("toolsets", () => {
   });
 
   it("expandToolsets turns all into every real toolset and de-duplicates", () => {
-    expect(expandToolsets(["all"])).toEqual(["tasks"]);
-    expect(expandToolsets(["all", "tasks"])).toEqual(["tasks"]);
+    const real = toolsetNames.filter((name) => name !== "all");
+    expect(expandToolsets(["all"])).toEqual(real);
+    expect(expandToolsets(["all", "tasks"])).toEqual(real);
     expect(expandToolsets(["tasks", "tasks"])).toEqual(["tasks"]);
   });
 
@@ -44,12 +45,26 @@ describe("toolsets", () => {
     const ctx = context();
     expect(() => registerToolsets(ctx, ["all", "tasks"])).not.toThrow();
     const names = (await listTools(ctx.server)).map((t) => t.name).sort();
-    expect(names).toEqual(defaultToolNames);
+    expect(names).toEqual(allToolNames);
   });
 
   it("always registers weeek_version, even for an empty selection", async () => {
     const ctx = context();
     registerToolsets(ctx, []);
     expect((await listTools(ctx.server)).map((t) => t.name)).toEqual(["weeek_version"]);
+  });
+
+  it("registers only core + projects for the projects toolset", async () => {
+    const ctx = context();
+    registerToolsets(ctx, ["projects"]);
+    const names = (await listTools(ctx.server)).map((t) => t.name).sort();
+    expect(names).toEqual(["weeek_version", ...projectToolNames].sort());
+  });
+
+  it("registers only core + time for the time toolset", async () => {
+    const ctx = context();
+    registerToolsets(ctx, ["time"]);
+    const names = (await listTools(ctx.server)).map((t) => t.name).sort();
+    expect(names).toEqual(["weeek_version", ...timeToolNames].sort());
   });
 });

@@ -1,6 +1,6 @@
 import * as chrono from "chrono-node";
 
-export function parseDueDate(input: string, now: Date = new Date()): string {
+export function parseDay(input: string, now: Date = new Date()): string {
   const dt = chrono.parseDate(input, now, { forwardDate: true });
   if (!dt) throw new Error(`could not parse date: "${input}"`);
   const y = dt.getFullYear();

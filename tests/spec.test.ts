@@ -10,7 +10,7 @@ describe("spec snapshot", () => {
   });
 
   it("holds the operations as paths with HTTP-method keys", () => {
-    const methods = new Set(["get", "post", "put", "patch", "delete"]);
+    const methods = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
     const paths = Object.entries(spec.paths) as Array<[string, Record<string, unknown>]>;
     expect(paths.length).toBeGreaterThan(50);
     for (const [path, item] of paths) {

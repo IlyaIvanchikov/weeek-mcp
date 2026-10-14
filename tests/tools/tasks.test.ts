@@ -1,10 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTaskTools, MAX_AUTO_PAGES } from "../../src/tools/tasks.js";
 import { errorReply } from "../../src/tools/reply.js";
-import { Resolver } from "../../src/resolver.js";
-import { NameCache } from "../../src/cache.js";
+import { toolHarness } from "../helpers/tool-harness.js";
 
 // fs is mocked here so attach wiring can be exercised without touching disk;
 // the REAL path-jail exploit tests live in tests/attach.test.ts (unmocked fs).
@@ -14,26 +11,8 @@ vi.mock("node:fs/promises", () => ({
   stat: vi.fn(async () => ({ isFile: () => true, size: 3 })),
 }));
 
-const DEFAULT_ATTACH = { attachDir: "/allowed", maxBytes: 1000 };
-
-// The real MCP server parses raw tool-call args against the tool's zod schema shape
-// (via z.object(shape).parse(rawArgs)) before invoking the handler. The mocked
-// `server.registerTool` below replays that same parse step so these tests exercise
-// real zod behavior (including `.default(...)` application) instead of just calling the
-// handler with whatever raw object the test passes.
-function harness(clientOver: Record<string, any>, attachPolicy = DEFAULT_ATTACH, readPolicy = { maxBytes: 1024 }) {
-  const client = clientOver as any;
-  const cache = new NameCache(100000, () => 0);
-  const resolver = new Resolver(client, cache);
-  const server = new McpServer({ name: "t", version: "0" });
-  const handlers = new Map<string, Function>();
-  vi.spyOn(server, "registerTool").mockImplementation(((name: string, config: any, cb: Function) => {
-    const schema = z.object(config?.inputSchema ?? {});
-    handlers.set(name, (rawArgs: unknown) => cb(schema.parse(rawArgs)));
-    return undefined as any;
-  }) as any);
-  registerTaskTools({ server, client, resolver, cache, attachPolicy, readPolicy });
-  return handlers;
+function harness(clientOver: Record<string, any>, readPolicy?: { maxBytes: number }) {
+  return toolHarness(registerTaskTools, clientOver, { readPolicy }).handlers;
 }
 
 const baseClient = {
@@ -167,10 +146,12 @@ describe("task tools", () => {
     expect(JSON.parse(res.content[0].text)).toEqual({ id: 7, title: "T" });
   });
 
-  it("weeek_list_projects returns the list", async () => {
-    const h = harness({ projects: { list: async () => [{ id: 1, name: "Marketing" }] } });
+  it("weeek_list_projects returns a summary without description, colour or team", async () => {
+    const summary = { id: 1, name: "Marketing", isPrivate: false, status: "active", portfolioId: 4 };
+    const fullProject = { ...summary, description: "Long text", color: "#fff", team: ["u1"] };
+    const h = harness({ projects: { list: async () => [fullProject] } });
     const res = await h.get("weeek_list_projects")!({});
-    expect(JSON.parse(res.content[0].text)).toEqual([{ id: 1, name: "Marketing" }]);
+    expect(JSON.parse(res.content[0].text)).toEqual([summary]);
   });
 
   it("weeek_list_members returns the members list", async () => {
@@ -352,7 +333,7 @@ describe("task tools", () => {
       url: "https://api.weeek.net/f/a5", size: 4, createdAt: "2026-08-01T10:00:00Z",
     };
     const download = vi.fn(async () => ({ bytes: new Uint8Array([1]), contentType: "image/png" }));
-    const h = harness({ attachments: { get: async () => attachment, download } }, DEFAULT_ATTACH, { maxBytes: 4096 });
+    const h = harness({ attachments: { get: async () => attachment, download } }, { maxBytes: 4096 });
     await h.get("weeek_get_attachment")!({ id: "a5" });
     expect(download).toHaveBeenCalledWith({ attachment, maxBytes: 4096 });
   });
@@ -371,5 +352,67 @@ describe("task tools", () => {
     const res = await h.get("weeek_get_attachment")!({ id: "a6" });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toMatch(/too large/);
+  });
+
+  it("weeek_list_tasks forwards the Phase 2 filters as the API spells them", async () => {
+    const list = vi.fn(async () => []);
+    const h = harness({ tasks: { list } });
+    await h.get("weeek_list_tasks")!({ all: true, search: "deploy", priority: "high", type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
+    expect(list.mock.calls[0][0]).toMatchObject({ all: 1, search: "deploy", priority: 2, type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
+  });
+
+  it("weeek_list_tasks rejects a priority outside the four names", async () => {
+    const h = harness({ tasks: { list: vi.fn() } });
+    // The harness parses synchronously, so wrap the call to observe the zod rejection.
+    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow();
+  });
+
+  it("create_task sends the priority code, the type and the parent", async () => {
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "Sub", project: "Marketing", priority: "hold", type: "meet", parent: 70 });
+    expect(create).toHaveBeenCalledWith({ title: "Sub", projectId: 1, priority: 3, type: "meet", parentId: 70 });
+  });
+
+  it("update_task resolves tags by name and sends the new fields only when given", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tags: { list: async () => [{ id: 5, title: "Urgent", color: "#f00" }] }, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", 6], priority: "high", type: "call", duration: 90, start: "2026-08-01" });
+    expect(update).toHaveBeenCalledWith(3, { tags: [5, 6], priority: 2, type: "call", duration: 90, startDate: "2026-08-01" });
+  });
+
+  it("weeek_list_boards resolves the project by name", async () => {
+    const list = vi.fn(async (_pid: number) => [{ id: 10, name: "Main", projectId: 1, isPrivate: false }]);
+    const h = harness({ ...baseClient, boards: { list } });
+    const res = await h.get("weeek_list_boards")!({ project: "marketing" });
+    expect(list).toHaveBeenCalledWith(1);
+    expect(JSON.parse(res.content[0].text)).toEqual([{ id: 10, name: "Main", projectId: 1, isPrivate: false }]);
+  });
+
+  it("weeek_list_columns takes a board id, or a board name with its project", async () => {
+    const list = vi.fn(async (_bid: number) => [{ id: 100, name: "Done", boardId: 10 }]);
+    const h = harness({ ...baseClient, columns: { list } });
+    await h.get("weeek_list_columns")!({ board: 10 });
+    expect(list).toHaveBeenLastCalledWith(10);
+    await h.get("weeek_list_columns")!({ board: "main", project: "Marketing" });
+    expect(list).toHaveBeenLastCalledWith(10);
+  });
+
+  it("weeek_list_columns refuses a board name without a project instead of guessing", async () => {
+    const list = vi.fn();
+    const h = harness({ ...baseClient, columns: { list } });
+    const res = await h.get("weeek_list_columns")!({ board: "Main" });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/needs a project \(name or id\)/);
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("update_task fetches the tag list once when several tag names resolve on a cold cache", async () => {
+    const tagList = vi.fn(async () => [{ id: 5, title: "Urgent", color: "#f00" }, { id: 7, title: "Backend", color: "#0f0" }]);
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tags: { list: tagList }, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", "backend"] });
+    expect(tagList).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(3, { tags: [5, 7] });
   });
 });

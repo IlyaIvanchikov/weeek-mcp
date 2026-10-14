@@ -1,26 +1,78 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
+import { apiFlag } from "./requests.js";
 import { pickArray } from "./responses.js";
-import type { Attachment, NewTask, WeeekTask } from "./types.js";
+import { priorityName } from "./priority.js";
+import { taskTypes } from "./constants.js";
+import type { Attachment, CommentsPage, NewTask, SuccessResponse, TaskComment, TaskLocation, TaskType, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
 export interface UploadAttachmentOptions { taskId: number; filename: string; bytes: Uint8Array | Blob; }
+export interface ListCommentsOptions { taskId: number; limit?: number; offset?: number; }
+export interface AddCommentOptions { taskId: number; markdown: string; parentId?: number; }
+export interface CommentRef { taskId: number; commentId: number; }
+export interface TaskMembersOptions { taskId: number; memberIds: string[]; }
+export interface AddLocationOptions { taskId: number; projectId: number; boardColumnId?: number; }
+export interface RemoveLocationOptions { taskId: number; projectId: number; }
+export interface SetParentOptions { taskId: number; parentId: number | null; }
+export interface AddTimeEntryOptions { taskId: number; entry: TimeEntryFields; }
+export interface UpdateTimeEntryOptions { taskId: number; timeEntryId: string; entry: TimeEntryFields; }
+export interface TimeEntryRef { taskId: number; timeEntryId: string; }
 
 const ops = operations.tasks;
+
+const optionalNumber = (value: unknown): number | null => (value == null ? null : Number(value));
+const optionalString = (value: unknown): string | null => (value == null ? null : String(value));
+
+function toLocation(raw: any): TaskLocation {
+  return { projectId: Number(raw.projectId), boardId: optionalNumber(raw.boardId), boardColumnId: optionalNumber(raw.boardColumnId) };
+}
+
+/** The spec wants isOvertime as 0 or 1 on the wire, not a boolean. */
+function timeEntryBody(entry: TimeEntryFields) {
+  return { ...entry, isOvertime: apiFlag(entry.isOvertime) };
+}
+
+export function toTimeEntry(raw: any): TimeEntry {
+  return {
+    id: String(raw.id ?? ""), userId: String(raw.userId ?? ""), date: String(raw.date ?? ""),
+    duration: Number(raw.duration ?? 0), isOvertime: Boolean(raw.isOvertime), comment: raw.comment == null ? "" : String(raw.comment),
+  };
+}
+
+function toComment(raw: any): TaskComment {
+  return {
+    id: Number(raw.id), parentId: optionalNumber(raw.parentId), authorId: String(raw.authorId ?? ""),
+    markdown: String(raw.markdown ?? ""), createdAt: String(raw.createdAt ?? ""), updatedAt: String(raw.updatedAt ?? ""),
+  };
+}
 
 function toTask(raw: any): WeeekTask {
   return {
     id: Number(raw.id),
     title: String(raw.title ?? ""),
     description: raw.description ?? null,
-    projectId: raw.projectId == null ? null : Number(raw.projectId),
-    boardId: raw.boardId == null ? null : Number(raw.boardId),
-    boardColumnId: raw.boardColumnId == null ? null : Number(raw.boardColumnId),
-    // WEEEK assigns the task creator by default; assignees are read-only on this shape.
+    projectId: optionalNumber(raw.projectId),
+    boardId: optionalNumber(raw.boardId),
+    boardColumnId: optionalNumber(raw.boardColumnId),
+    parentId: optionalNumber(raw.parentId),
+    subTasks: Array.isArray(raw.subTasks) ? raw.subTasks.map(Number) : [],
     assignees: Array.isArray(raw.assignees) ? raw.assignees.map(String) : [],
-    dueDate: raw.dueDate == null ? null : String(raw.dueDate),
+    // The API calls watchers "subscribers" on the task and "watchers" on the endpoint that sets them.
+    watchers: Array.isArray(raw.subscribers) ? raw.subscribers.map(String) : [],
+    authorId: optionalString(raw.authorId),
+    priority: priorityName(raw.priority),
+    type: (taskTypes as readonly string[]).includes(raw.type) ? (raw.type as TaskType) : null,
+    startDate: optionalString(raw.startDate),
+    dueDate: optionalString(raw.dueDate),
     completed: Boolean(raw.isCompleted ?? raw.completed ?? false),
+    completedAt: optionalString(raw.completedAt),
+    createdAt: optionalString(raw.createdAt),
+    duration: optionalNumber(raw.duration),
+    tags: Array.isArray(raw.tags) ? raw.tags.map(Number) : [],
+    locations: Array.isArray(raw.locations) ? raw.locations.map(toLocation) : [],
+    timeEntries: Array.isArray(raw.timeEntries) ? raw.timeEntries.map(toTimeEntry) : [],
     // The API returns these with every task; surfacing them is what lets a caller see a
     // screenshot-only description instead of silently working from the prose.
     attachments: Array.isArray(raw.attachments) ? (raw.attachments as Attachment[]) : [],
@@ -42,6 +94,9 @@ export class TasksApi {
     if (newTask.description !== undefined) payload.description = newTask.description;
     if (newTask.userId !== undefined) payload.userId = newTask.userId;
     if (newTask.dayFrom !== undefined) payload.dayFrom = newTask.dayFrom;
+    if (newTask.priority !== undefined) payload.priority = newTask.priority;
+    if (newTask.type !== undefined) payload.type = newTask.type;
+    if (newTask.parentId !== undefined) payload.parentId = newTask.parentId;
     const json = await this.http.execute<{ task: unknown }>(ops.create, { body: payload });
     return toTask(json.task);
   }
@@ -56,8 +111,8 @@ export class TasksApi {
     return toTask(json.task);
   }
 
-  async remove(id: number): Promise<{ success: boolean }> {
-    return this.http.execute<{ success: boolean }>(ops.remove, { params: { taskId: id } });
+  async remove(id: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.remove, { params: { taskId: id } });
   }
 
   async setCompleted({ taskId, completed }: SetCompletedOptions): Promise<WeeekTask> {
@@ -82,5 +137,81 @@ export class TasksApi {
     // multipart array and the live shape has not been pinned down (FOLLOWUPS #18).
     if (Array.isArray(json.data)) return json.data as Attachment[];
     return json.data ? [json.data as Attachment] : [];
+  }
+
+  async listComments({ taskId, limit, offset }: ListCommentsOptions): Promise<CommentsPage> {
+    const json = await this.http.execute<Record<string, unknown>>(ops.listComments, { params: { taskId }, query: { limit, offset } });
+    return { comments: pickArray(json, "comments").map(toComment), hasMore: Boolean(json.hasMore) };
+  }
+
+  async addComment({ taskId, markdown, parentId }: AddCommentOptions): Promise<TaskComment> {
+    const body: Record<string, unknown> = { markdown };
+    if (parentId !== undefined) body.parentId = parentId;
+    const json = await this.http.execute<{ comment: unknown }>(ops.addComment, { params: { taskId }, body });
+    return toComment(json.comment);
+  }
+
+  async removeComment({ taskId, commentId }: CommentRef): Promise<void> {
+    await this.http.execute(ops.removeComment, { params: { taskId, commentId } });
+  }
+
+  async addAssignees({ taskId, memberIds }: TaskMembersOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.addAssignees, { params: { taskId }, body: { assignees: memberIds } });
+    return this.get(taskId);
+  }
+
+  async removeAssignees({ taskId, memberIds }: TaskMembersOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.removeAssignees, { params: { taskId }, body: { assignees: memberIds } });
+    return this.get(taskId);
+  }
+
+  async addWatchers({ taskId, memberIds }: TaskMembersOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.addWatchers, { params: { taskId }, body: { watchers: memberIds } });
+    return this.get(taskId);
+  }
+
+  async removeWatchers({ taskId, memberIds }: TaskMembersOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.removeWatchers, { params: { taskId }, body: { watchers: memberIds } });
+    return this.get(taskId);
+  }
+
+  async addLocation({ taskId, projectId, boardColumnId }: AddLocationOptions): Promise<WeeekTask> {
+    const body: Record<string, unknown> = { projectId };
+    if (boardColumnId !== undefined) body.boardColumnId = boardColumnId;
+    await this.http.execute(ops.addLocation, { params: { taskId }, body });
+    return this.get(taskId);
+  }
+
+  async removeLocation({ taskId, projectId }: RemoveLocationOptions): Promise<WeeekTask> {
+    await this.http.execute(ops.removeLocation, { params: { taskId }, body: { projectId } });
+    return this.get(taskId);
+  }
+
+  async setParent({ taskId, parentId }: SetParentOptions): Promise<WeeekTask> {
+    // parentId: null is how the API detaches a subtask, so the key is always sent.
+    await this.http.execute(ops.setParent, { params: { taskId }, body: { parentId } });
+    return this.get(taskId);
+  }
+
+  async startTimer(taskId: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.startTimer, { params: { taskId } });
+  }
+
+  async stopTimer(taskId: number): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.stopTimer, { params: { taskId } });
+  }
+
+  async addTimeEntry({ taskId, entry }: AddTimeEntryOptions): Promise<TimeEntry> {
+    const json = await this.http.execute<{ data: unknown }>(ops.addTimeEntry, { params: { taskId }, body: timeEntryBody(entry) });
+    return toTimeEntry(json.data);
+  }
+
+  async updateTimeEntry({ taskId, timeEntryId, entry }: UpdateTimeEntryOptions): Promise<TimeEntry> {
+    const json = await this.http.execute<{ data: unknown }>(ops.updateTimeEntry, { params: { taskId, timeEntryId }, body: timeEntryBody(entry) });
+    return toTimeEntry(json.data);
+  }
+
+  async removeTimeEntry({ taskId, timeEntryId }: TimeEntryRef): Promise<SuccessResponse> {
+    return this.http.execute<SuccessResponse>(ops.removeTimeEntry, { params: { taskId, timeEntryId } });
   }
 }

@@ -8,4 +8,10 @@ describe("WorkspaceApi", () => {
     expect(await new WorkspaceApi(httpWith(f)).listMembers()).toEqual([{ id: "u9", name: "Ilya I" }, { id: "u2", name: "x@y.z" }]);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/ws/members");
   });
+
+  it("get GETs /ws and normalises the workspace", async () => {
+    const f = jsonFetch(200, { success: true, workspace: { id: 3, title: "Acme", description: null, isPersonal: false, logo: null } });
+    expect(await new WorkspaceApi(httpWith(f)).get()).toEqual({ id: 3, title: "Acme", description: null, isPersonal: false });
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/ws");
+  });
 });

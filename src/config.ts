@@ -26,15 +26,18 @@ export interface Config {
   toolsets: readonly ToolsetName[];
 }
 
+export function isToolsetName(value: string): value is ToolsetName {
+  return (toolsetNames as readonly string[]).includes(value);
+}
+
 export function parseToolsets(raw: string | undefined): ToolsetName[] {
   const names = (raw ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0);
   if (names.length === 0) return [...defaultToolsets];
-  const known: readonly string[] = toolsetNames;
-  const unknown = names.find((n) => !known.includes(n));
+  const unknown = names.find((name) => !isToolsetName(name));
   if (unknown !== undefined) {
     throw new Error(`invalid config: WEEEK_TOOLSETS: unknown toolset "${unknown}"; valid values: ${toolsetNames.join(", ")}`);
   }
-  return [...new Set(names)] as ToolsetName[];
+  return [...new Set(names.filter(isToolsetName))];
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
