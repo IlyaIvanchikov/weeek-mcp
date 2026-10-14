@@ -40,4 +40,24 @@ describe("NameCache", () => {
     await cache.get("boards:10", load);
     expect(load).toHaveBeenCalledTimes(5);
   });
+  it("shares one in-flight load between concurrent gets of a key", async () => {
+    const cache = new NameCache(100000, () => 0);
+    const projects = [{ id: 1, name: "A" }];
+    const load = vi.fn(async () => projects);
+    const [first, second] = await Promise.all([cache.get("projects", load), cache.get("projects", load)]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(projects);
+    expect(second).toEqual(projects);
+  });
+  it("does not cache a failed load and retries on the next get", async () => {
+    const cache = new NameCache(100000, () => 0);
+    const projects = [{ id: 1, name: "A" }];
+    const load = vi.fn<() => Promise<typeof projects>>()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(projects);
+    const settled = await Promise.allSettled([cache.get("projects", load), cache.get("projects", load)]);
+    expect(settled.map((outcome) => outcome.status)).toEqual(["rejected", "rejected"]);
+    expect(await cache.get("projects", load)).toEqual(projects);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
 });

@@ -425,4 +425,13 @@ describe("task tools", () => {
     expect(JSON.parse(res.content[0].text).error).toMatch(/needs projectId/);
     expect(list).not.toHaveBeenCalled();
   });
+
+  it("update_task fetches the tag list once when several tag names resolve on a cold cache", async () => {
+    const tagList = vi.fn(async () => [{ id: 5, title: "Urgent", color: "#f00" }, { id: 7, title: "Backend", color: "#0f0" }]);
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tags: { list: tagList }, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", "backend"] });
+    expect(tagList).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(3, { tags: [5, 7] });
+  });
 });
