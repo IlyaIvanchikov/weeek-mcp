@@ -177,4 +177,60 @@ describe("Resolver.resolve", () => {
     expect(boardsList).toHaveBeenCalledTimes(2);
     expect(columnsList).toHaveBeenCalledTimes(2);
   });
+
+  it("resolves a funnel by name, or by its opaque id, only against the loaded list", async () => {
+    const list = vi.fn(async () => [{ id: "OLY24hy2mC7n9D9l", name: "Sales", customFields: [] }]);
+    const r = new Resolver(clientWith({ crm: { funnels: { list } } }), freshCache());
+    expect(await r.resolve({ kind: "funnel", value: "sales" })).toBe("OLY24hy2mC7n9D9l");
+    expect(await r.resolve({ kind: "funnel", value: "OLY24hy2mC7n9D9l" })).toBe("OLY24hy2mC7n9D9l");
+    await expect(r.resolve({ kind: "funnel", value: "ZZZ24hy2mC7n9D9l" })).rejects.toThrow(/could not resolve funnel "ZZZ24hy2mC7n9D9l"; candidates: none/);
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves a custom field inside its scope, caching each scope apart", async () => {
+    const field = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Estimate", type: "number", config: null, options: [] };
+    const list = vi.fn(async (scope: { kind: string }) => (scope.kind === "global" ? [field] : []));
+    const r = new Resolver(clientWith({ customFields: { list } }), freshCache());
+    expect(await r.resolve({ kind: "customField", value: "estimate" })).toBe(field.id);
+    await expect(r.resolve({ kind: "customField", value: "estimate", scope: { fieldScope: { kind: "project", projectId: 2 } } })).rejects.toThrow(/could not resolve custom field "estimate"/);
+    expect(list).toHaveBeenNthCalledWith(1, { kind: "global" });
+    expect(list).toHaveBeenNthCalledWith(2, { kind: "project", projectId: 2 });
+  });
+
+  it("find returns the matched entry itself, for a name and for an id", async () => {
+    const field = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
+    const r = new Resolver(clientWith({ customFields: { list: async () => [field] } }), freshCache());
+    expect(await r.find({ kind: "customField", value: "stage" })).toEqual(field);
+    expect(await r.find({ kind: "customField", value: field.id })).toEqual(field);
+    await expect(r.find({ kind: "customField", value: "0b1e4d7c-9999-4aaa-8bbb-000000000009" })).rejects.toThrow(/could not resolve custom field/);
+  });
+
+  it("list returns the cached entries of a scope", async () => {
+    const list = vi.fn(async () => [{ id: 1, name: "Marketing" }]);
+    const r = new Resolver(clientWith({ projects: { list } }), freshCache());
+    expect(await r.list({ kind: "project" })).toEqual([{ id: 1, name: "Marketing" }]);
+    await r.list({ kind: "project" });
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgetting a custom field drops every field scope", async () => {
+    const list = vi.fn(async () => []);
+    const r = new Resolver(clientWith({ customFields: { list } }), freshCache());
+    await r.list({ kind: "customField" });
+    await r.list({ kind: "customField", scope: { fieldScope: { kind: "board", boardId: 3 } } });
+    r.forget({ kind: "customField" });
+    await r.list({ kind: "customField" });
+    await r.list({ kind: "customField", scope: { fieldScope: { kind: "board", boardId: 3 } } });
+    expect(list).toHaveBeenCalledTimes(4);
+  });
+
+  it("forgetting a board in a project also drops the per-board column lists", async () => {
+    const boardsList = vi.fn(async (_pid: number) => [{ id: 10, name: "Main" }]);
+    const columnsList = vi.fn(async (_bid: number) => [{ id: 100, name: "Done" }]);
+    const r = new Resolver(clientWith({ boards: { list: boardsList }, columns: { list: columnsList } }), freshCache());
+    await r.resolve({ kind: "column", value: "Done", scope: { boardId: 10 } });
+    r.forget({ kind: "board", scope: { projectId: 1 } });
+    await r.resolve({ kind: "column", value: "Done", scope: { boardId: 10 } });
+    expect(columnsList).toHaveBeenCalledTimes(2);
+  });
 });
