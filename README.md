@@ -72,8 +72,8 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `custom-fields` | `weeek_list_custom_fields`, `weeek_create_custom_field`, `weeek_update_custom_field`, `weeek_delete_custom_field`, `weeek_transfer_custom_field`, `weeek_move_custom_field`, `weeek_add_field_option`, `weeek_update_field_option`, `weeek_delete_field_option`, `weeek_move_field_option` | |
 | `all` | every toolset | |
 
-`weeek_version` is always available. The default is the task surface: 16 472 bytes of
-tool schemas per request; `all` is 44 010 bytes. `crm` (1.0.0) arrives in the next release;
+`weeek_version` is always available. The default is the task surface: 16 504 bytes of
+tool schemas per request; `all` is 44 042 bytes. `crm` (1.0.0) arrives in the next release;
 an unknown name is rejected at startup with the list of valid ones.
 
 Custom-field **values** need no extra toolset: `weeek_get_task` returns them, and
