@@ -229,7 +229,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_create_task", {
     description:
-      "Create a WEEEK task. Accepts project/column/assignee by NAME or id, a natural-language `due` date, a priority (low, medium, high, hold), a type (action, meet, call) a `parent` task id for a subtask, and custom-field values in `fields` by field name (global and project fields). One call — no need to look up ids first. Omit `assignee` to self-assign; to change assignees later use weeek_add_assignees / weeek_remove_assignees.",
+      "Create a WEEEK task. Accepts project/column/assignee by NAME or id, a natural-language `due` date, a priority (low, medium, high, hold), a type (action, meet, call), a `parent` task id for a subtask, and custom-field values in `fields` by field name (global and project fields). One call — no need to look up ids first. Omit `assignee` to self-assign; to change assignees later use weeek_add_assignees / weeek_remove_assignees.",
     inputSchema: createShape,
   }, async (args) => client.tasks.create(await buildNewTask(resolver, args)));
 
