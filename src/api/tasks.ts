@@ -4,7 +4,8 @@ import { apiFlag } from "./requests.js";
 import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
-import type { Attachment, CommentsPage, NewTask, SuccessResponse, TaskComment, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
+import { toCustomField } from "./custom-fields.js";
+import type { Attachment, BoardFieldSample, CommentsPage, CustomField, NewTask, SuccessResponse, TaskComment, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -49,6 +50,11 @@ function toComment(raw: unknown): TaskComment {
     id: Number(r.id), parentId: optionalNumber(r.parentId), authorId: String(r.authorId ?? ""),
     markdown: String(r.markdown ?? ""), createdAt: String(r.createdAt ?? ""), updatedAt: String(r.updatedAt ?? ""),
   };
+}
+
+function fieldsOf(rawTask: unknown): CustomField[] {
+  const fields = asRecord(rawTask).customFields;
+  return Array.isArray(fields) ? fields.map(toCustomField) : [];
 }
 
 function toTask(raw: unknown): WeeekTask {
@@ -103,6 +109,24 @@ export class TasksApi {
     if (newTask.parentId !== undefined) payload.parentId = newTask.parentId;
     const json = await this.http.execute<{ task: unknown }>(ops.create, { body: payload });
     return toTask(json.task);
+  }
+
+  /** A task's fields with their options — what a value by name is resolved against. */
+  async getFields(taskId: number): Promise<CustomField[]> {
+    const json = await this.http.execute<{ task: unknown }>(ops.get, { params: { taskId } });
+    return fieldsOf(json.task);
+  }
+
+  /**
+   * One task of the board, with every task state, as the only readable source of a board's fields
+   * (see CustomFieldsApi.list). Null when the board has no task at all.
+   */
+  async sampleBoardFields(boardId: number): Promise<BoardFieldSample | null> {
+    const json = await this.http.execute<Record<string, unknown>>(ops.list, { query: { boardId, perPage: 1, all: 1 } });
+    const [firstTask] = pickArray(json, "tasks");
+    if (firstTask === undefined) return null;
+    const onThisBoard = toTask(firstTask).locations.find((location) => location.boardId === boardId);
+    return { projectId: onThisBoard?.projectId ?? null, fields: fieldsOf(firstTask) };
   }
 
   async get(id: number): Promise<WeeekTask> {

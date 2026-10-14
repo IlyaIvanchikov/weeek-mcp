@@ -3,6 +3,7 @@ import { operations } from "../operations.js";
 import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { apiFlag } from "./requests.js";
 import { projectStatuses } from "./constants.js";
+import { toCustomField } from "./custom-fields.js";
 import type { NewProject, Project, ProjectUpdate, SuccessResponse } from "./types.js";
 
 export interface UpdateProjectOptions { projectId: number; update: ProjectUpdate; }
@@ -21,6 +22,7 @@ export function toProject(raw: unknown): Project {
     isPrivate: Boolean(r.isPrivate),
     portfolioId: r.portfolioId == null ? null : Number(r.portfolioId),
     team: Array.isArray(r.team) ? r.team.map(String) : [],
+    customFields: Array.isArray(r.customFields) ? r.customFields.map(toCustomField) : [],
   };
 }
 

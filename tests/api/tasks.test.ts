@@ -230,4 +230,23 @@ describe("TasksApi", () => {
     expect(t.locations).toEqual([]);
     expect(t.timeEntries).toEqual([]);
   });
+
+  it("getFields reads a task's fields with their options off GET /tm/tasks/{id}", async () => {
+    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Review", color: "blue" }], value: null };
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, customFields: [rawField] } });
+    expect(await new TasksApi(httpWith(f)).getFields(78)).toEqual([{ id: rawField.id, name: "Stage", type: "select", config: null, options: rawField.options }]);
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
+  });
+
+  it("sampleBoardFields reads one task of the board, with every task state, and the project it sits in there", async () => {
+    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "text", options: [], value: "x" };
+    const f = jsonFetch(200, { success: true, tasks: [{ ...rawTask, locations: [{ projectId: 9, boardId: 1 }, { projectId: 2, boardId: 3 }], customFields: [rawField] }] });
+    expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({ projectId: 2, fields: [{ id: rawField.id, name: "Stage", type: "text", config: null, options: [] }] });
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks?boardId=3&perPage=1&all=1");
+  });
+
+  it("sampleBoardFields is null for a board without tasks", async () => {
+    const f = jsonFetch(200, { success: true, tasks: [] });
+    expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toBeNull();
+  });
 });

@@ -3,7 +3,7 @@ import { ProjectsApi } from "../../src/api/projects.js";
 import { jsonFetch, httpWith, sent, bearer } from "../helpers/http.js";
 
 const rawProject = { id: 1, name: "Marketing", description: null, color: "#fff", status: 1, isPrivate: false, portfolioId: 7, team: ["u1"], customFields: [], logoLink: null };
-const project = { id: 1, name: "Marketing", description: null, color: "#fff", status: 1, isPrivate: false, portfolioId: 7, team: ["u1"] };
+const project = { id: 1, name: "Marketing", description: null, color: "#fff", status: 1, isPrivate: false, portfolioId: 7, team: ["u1"], customFields: [] };
 const base = "https://api.weeek.net/public/v1/tm/projects";
 
 describe("ProjectsApi", () => {
@@ -16,7 +16,7 @@ describe("ProjectsApi", () => {
 
   it("list defaults missing fields instead of failing", async () => {
     const f = jsonFetch(200, { success: true, projects: [{ id: 2, name: "Bare", status: 9 }] });
-    expect(await new ProjectsApi(httpWith(f)).list()).toEqual([{ id: 2, name: "Bare", description: null, color: null, status: null, isPrivate: false, portfolioId: null, team: [] }]);
+    expect(await new ProjectsApi(httpWith(f)).list()).toEqual([{ id: 2, name: "Bare", description: null, color: null, status: null, isPrivate: false, portfolioId: null, team: [], customFields: [] }]);
   });
 
   it("get GETs /tm/projects/{id}", async () => {
