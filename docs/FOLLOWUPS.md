@@ -28,7 +28,7 @@ None of these block v0.1; the create-by-name path is verified sound and token ha
     - ~~Add `tests/api/responses.test.ts` for the `toNamed`/`toMember` fallbacks, and a test for the "unusable url" guard in `AttachmentsApi.download`.~~ — RESOLVED (Phase 2, Task 5): tests/api/responses.test.ts; the "unusable url" guard test was added to tests/api/attachments.test.ts.
     - ~~Restore the resolver cases dropped in Phase 1: board-scoped numeric passthrough, UUID trimming, the five-candidate cap, and the `needs … projectId` text for column.~~ — RESOLVED (Phase 2, Task 7)
     - ~~Use OpenAPI's eight methods in `tests/spec.test.ts` and `tests/contract.test.ts`, not the five the server calls today.~~ — RESOLVED (Phase 2, Task 1).
-    - Typecheck `tests/` in CI (a `tsconfig.tests.json`); tidy the pre-existing `vi.fn()` tuple errors it reports first. Deferred to the Phase 3 entry list: wide and mechanical (every fixture), and it hides no bug.
+    - ~~Typecheck `tests/` in CI (a `tsconfig.tests.json`); tidy the pre-existing `vi.fn()` tuple errors it reports first.~~ — RESOLVED (Phase 3, Task 1): `npm run typecheck` runs both configs; the 18 errors were untyped fetch stubs and two fixtures with literal-`null` fields.
     - ~~Clear `dist/` before `build`, so a deleted source file cannot leave a stale module in the package.~~ — RESOLVED (Phase 2, Task 1).
     - `raw: any` → `unknown` in the normalisers. Deferred to the Phase 3 entry list: wide and mechanical (every normaliser), and it hides no bug.
     - ~~A type guard instead of `as ToolsetName[]` in `parseToolsets`.~~ — RESOLVED (Phase 2, Task 1).

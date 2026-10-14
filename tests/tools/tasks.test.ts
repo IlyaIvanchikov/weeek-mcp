@@ -22,6 +22,9 @@ const baseClient = {
   workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] },
 };
 
+/** A tasks.list stub whose recorded query is typed, so `list.mock.calls[0][0]` compiles. */
+const listStub = () => vi.fn(async (_query: Record<string, unknown>): Promise<unknown[]> => []);
+
 describe("task tools", () => {
   it("create_task resolves names to ids before creating", async () => {
     const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
@@ -161,21 +164,21 @@ describe("task tools", () => {
   });
 
   it("weeek_list_tasks with no args applies the default perPage/offset", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({});
     expect(list.mock.calls[0][0]).toMatchObject({ perPage: 20, offset: 0 });
   });
 
   it("weeek_list_tasks with a projectId filter still applies the default perPage", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({ projectId: 5 });
     expect(list.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
   });
 
   it("weeek_list_tasks forwards server-side user, status, and date filters", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
@@ -355,7 +358,7 @@ describe("task tools", () => {
   });
 
   it("weeek_list_tasks forwards the Phase 2 filters as the API spells them", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({ all: true, search: "deploy", priority: "high", type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
     expect(list.mock.calls[0][0]).toMatchObject({ all: 1, search: "deploy", priority: 2, type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });

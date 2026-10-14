@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { registerProjectTools } from "../../src/tools/projects.js";
 import { toolHarness, reply } from "../helpers/tool-harness.js";
 
-const marketing = { id: 1, name: "Marketing", description: null, color: "#fff", status: 1, isPrivate: false, portfolioId: null, team: [] };
+import type { Project } from "../../src/client.js";
+
+const marketing: Project = { id: 1, name: "Marketing", description: null, color: "#fff", status: 1, isPrivate: false, portfolioId: null, team: [] };
 const client = () => ({
   projects: { list: vi.fn(async () => [marketing]), get: vi.fn(async () => marketing) },
   boards: { list: vi.fn(async () => [{ id: 10, name: "Main", projectId: 1, isPrivate: false }, { id: 11, name: "Backlog", projectId: 1, isPrivate: false }]) },
