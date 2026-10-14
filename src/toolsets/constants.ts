@@ -3,6 +3,7 @@
 // count. Pick more with WEEEK_TOOLSETS (comma-separated) or "all". The set grows by one
 // per release phase: projects, custom-fields, crm.
 // time: the timer and time entries, carved out so the default stays small.
-export const toolsetNames = ["tasks", "time", "all"] as const;
+// projects: projects, boards, columns, portfolios, tags, workspace — the structure around tasks.
+export const toolsetNames = ["tasks", "time", "projects", "all"] as const;
 // parseToolsets returns this as ToolsetName[], so a misspelt member fails the type check there.
 export const defaultToolsets = ["tasks"] as const;

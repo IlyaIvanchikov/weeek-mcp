@@ -7,7 +7,7 @@ import { WeeekClient } from "../../src/client.js";
 import { Resolver } from "../../src/resolver.js";
 import { NameCache } from "../../src/cache.js";
 import { listTools } from "../helpers/list-tools.js";
-import { allToolNames, defaultToolNames, timeToolNames } from "../helpers/tool-names.js";
+import { allToolNames, defaultToolNames, projectToolNames, timeToolNames } from "../helpers/tool-names.js";
 import { httpConfig } from "../helpers/http.js";
 
 function context(): ToolContext {
@@ -59,6 +59,13 @@ describe("toolsets", () => {
     registerToolsets(ctx, ["all"]);
     const names = (await listTools(ctx.server)).map((t) => t.name).sort();
     expect(names).toEqual(allToolNames);
+  });
+
+  it("registers only core + projects for the projects toolset", async () => {
+    const ctx = context();
+    registerToolsets(ctx, ["projects"]);
+    const names = (await listTools(ctx.server)).map((t) => t.name).sort();
+    expect(names).toEqual(["weeek_version", ...projectToolNames].sort());
   });
 
   it("registers only core + time for the time toolset", async () => {

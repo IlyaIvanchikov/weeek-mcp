@@ -10,5 +10,10 @@ export const defaultToolNames = [
   "weeek_add_task_to_project", "weeek_remove_task_from_project", "weeek_set_task_parent",
 ].sort();
 export const timeToolNames = ["weeek_set_timer", "weeek_add_time_entry", "weeek_update_time_entry", "weeek_delete_time_entry"].sort();
+export const projectToolNames = [
+  "weeek_get_project", "weeek_create_project", "weeek_update_project", "weeek_archive_project", "weeek_delete_project",
+  "weeek_create_board", "weeek_update_board", "weeek_delete_board", "weeek_move_board",
+  "weeek_create_column", "weeek_update_column", "weeek_delete_column", "weeek_move_column",
+].sort();
 /** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
-export const allToolNames = [...defaultToolNames, ...timeToolNames].sort();
+export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames].sort();

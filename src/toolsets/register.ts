@@ -3,6 +3,7 @@ import { registerTaskTools } from "../tools/tasks.js";
 import { registerCommentTools } from "../tools/comments.js";
 import { registerTaskLinkTools } from "../tools/task-links.js";
 import { registerTimeTools } from "../tools/time.js";
+import { registerProjectTools } from "../tools/projects.js";
 import type { ToolContext, ToolsetName } from "./types.js";
 
 type RealToolset = Exclude<ToolsetName, "all">;
@@ -14,6 +15,7 @@ const registrars: Record<RealToolset, (ctx: ToolContext) => void> = {
     registerTaskLinkTools(ctx);
   },
   time: registerTimeTools,
+  projects: registerProjectTools,
 };
 
 export function expandToolsets(selected: readonly ToolsetName[]): RealToolset[] {
