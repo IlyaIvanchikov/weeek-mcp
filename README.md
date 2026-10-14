@@ -13,6 +13,8 @@ weeek_create_task({ title: "Ship v1", project: "Marketing",
                     column: "In Progress", assignee: "Ilya", due: "next friday" })
 ```
 
+Then `weeek_add_comment`, `weeek_add_assignees`, `weeek_set_task_parent` — all by name, all one call.
+
 No `list_projects → list_boards → list_columns → list_members` dance first.
 
 <!-- DEMO: drop a gif/screenshot here — an agent creating a task by name in one call.
@@ -54,6 +56,7 @@ This server is driven by an LLM that can read untrusted content (task text, web 
 - **`weeek_attach_file`** only reads files inside an allowed directory (its subfolders included). By default that's the server's **working directory** — so it works with no setup for local files, while paths outside it (`/etc/passwd`, `~/.ssh`, `..` traversal, symlinks that escape) are refused. Set `WEEEK_ATTACH_DIR` to point the jail somewhere specific or lock it down further. No special folder is required.
 - **`weeek_delete_task`** is permanent and requires an explicit `confirm: true`; to merely close a task use `weeek_complete_task`.
 - **`weeek_get_attachment`** returns the image for an attachment WEEEK hosts itself, so a task specified in screenshots can be read rather than guessed at. It downloads bytes only when the attachment's `service` is `weeek`; an attachment parked in Google Drive/Dropbox/OneDrive/Box comes back as metadata with its URL instead. The download sends **no token at all**: WEEEK hands out a pre-signed one-hour URL that redirects to its storage bucket, and the server follows exactly one redirect, only to `https`, with no credentials on either hop. Non-images return metadata only, and anything over `WEEEK_ATTACH_MAX_BYTES` is refused rather than truncated.
+- **Every tool that deletes, archives or detaches** — a project, board, column, tag, portfolio, comment or time entry; an assignee or watcher; a task's membership of a project — requires `confirm: true` and is marked destructive in its annotations, so a client can ask before running it.
 
 ## Toolsets
 
@@ -62,14 +65,19 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 
 | Toolset | Tools | Default |
 |---|---|---|
-| `tasks` | `weeek_list_projects`, `weeek_list_tasks`, `weeek_get_task`, `weeek_list_members`, `weeek_get_attachment`, `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`, `weeek_attach_file`, `weeek_delete_task` | **yes** |
+| `tasks` | `weeek_list_projects`, `weeek_list_boards`, `weeek_list_columns`, `weeek_list_tasks`, `weeek_get_task`, `weeek_list_members`, `weeek_get_attachment`, `weeek_create_task`, `weeek_create_tasks`, `weeek_update_task`, `weeek_move_task`, `weeek_complete_task`, `weeek_attach_file`, `weeek_delete_task`, `weeek_list_comments`, `weeek_add_comment`, `weeek_delete_comment`, `weeek_add_assignees`, `weeek_remove_assignees`, `weeek_add_watchers`, `weeek_remove_watchers`, `weeek_add_task_to_project`, `weeek_remove_task_from_project`, `weeek_set_task_parent` | **yes** |
+| `time` | `weeek_set_timer`, `weeek_add_time_entry`, `weeek_update_time_entry`, `weeek_delete_time_entry` | |
+| `projects` | `weeek_get_project`, `weeek_create_project`, `weeek_update_project`, `weeek_archive_project`, `weeek_delete_project`, `weeek_create_board`, `weeek_update_board`, `weeek_delete_board`, `weeek_move_board`, `weeek_create_column`, `weeek_update_column`, `weeek_delete_column`, `weeek_move_column`, `weeek_list_portfolios`, `weeek_get_portfolio`, `weeek_create_portfolio`, `weeek_update_portfolio`, `weeek_delete_portfolio`, `weeek_list_tags`, `weeek_get_tag`, `weeek_create_tag`, `weeek_update_tag`, `weeek_delete_tag`, `weeek_get_workspace`, `weeek_get_profile` | |
 | `all` | every toolset | |
 
-`weeek_version` is always available. More toolsets (`projects`, `custom-fields`, `crm`) arrive in
-the next releases; an unknown name is rejected at startup with the list of valid ones.
+`weeek_version` is always available. The default is the task surface: 14 730 bytes of
+tool schemas per request; `all` is 29 104 bytes. `custom-fields` (0.7.0) and `crm`
+(1.0.0) arrive in the next releases; an unknown name is rejected at startup with the list of
+valid ones.
 
 ```bash
-WEEEK_TOOLSETS=all npx -y weeek-mcp-smart
+WEEEK_TOOLSETS=tasks,time npx -y weeek-mcp-smart   # add time tracking
+WEEEK_TOOLSETS=all npx -y weeek-mcp-smart          # everything
 ```
 
 ## Development
