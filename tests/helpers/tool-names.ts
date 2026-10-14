@@ -14,6 +14,9 @@ export const projectToolNames = [
   "weeek_get_project", "weeek_create_project", "weeek_update_project", "weeek_archive_project", "weeek_delete_project",
   "weeek_create_board", "weeek_update_board", "weeek_delete_board", "weeek_move_board",
   "weeek_create_column", "weeek_update_column", "weeek_delete_column", "weeek_move_column",
+  "weeek_list_portfolios", "weeek_get_portfolio", "weeek_create_portfolio", "weeek_update_portfolio", "weeek_delete_portfolio",
+  "weeek_list_tags", "weeek_get_tag", "weeek_create_tag", "weeek_update_tag", "weeek_delete_tag",
+  "weeek_get_workspace", "weeek_get_profile",
 ].sort();
 /** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
 export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames].sort();
