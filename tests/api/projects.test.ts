@@ -60,4 +60,11 @@ describe("ProjectsApi", () => {
     await new ProjectsApi(httpWith(g)).setArchived({ projectId: 1, archived: false });
     expect(sent(g, 0).url).toBe(`${base}/1/un-archive`);
   });
+
+  it("update omits color when not given and tolerates a non-array team", async () => {
+    const f = jsonFetch(200, { success: true, project: { ...rawProject, team: "nope" } });
+    const updated = await new ProjectsApi(httpWith(f)).update({ projectId: 1, update: { name: "M2", isPrivate: false } });
+    expect(sent(f, 0).json()).toEqual({ name: "M2", isPrivate: 0 });
+    expect(updated.team).toEqual([]);
+  });
 });

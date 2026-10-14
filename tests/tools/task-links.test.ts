@@ -68,6 +68,6 @@ describe("task link tools", () => {
     expect(setParent).toHaveBeenCalledWith({ taskId: 80, parentId: 78 });
     await h.call("weeek_set_task_parent", { id: 80, parent: null });
     expect(setParent).toHaveBeenLastCalledWith({ taskId: 80, parentId: null });
-    expect(() => h.call("weeek_set_task_parent", { id: 80 })).toThrow();
+    expect(() => h.call("weeek_set_task_parent", { id: 80 })).toThrow(/parent/);
   });
 });

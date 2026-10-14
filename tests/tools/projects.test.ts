@@ -73,7 +73,7 @@ describe("project tools", () => {
     const c = client();
     const create = vi.fn(async () => ({ id: 12, name: "QA", projectId: 1, isPrivate: false }));
     const h = toolHarness(registerProjectTools, { ...c, boards: { ...c.boards, create } });
-    await h.call("weeek_update_board", { board: "Main", project: "Marketing", name: "Main 2" }).catch(() => undefined); // warms boards:1
+    await h.resolver.resolve({ kind: "board", value: "Main", scope: { projectId: 1 } }); // warms boards:1
     await h.call("weeek_create_board", { project: "Marketing", name: "QA" });
     expect(create).toHaveBeenCalledWith({ name: "QA", projectId: 1 });
     await h.call("weeek_update_board", { board: "QA", project: "Marketing", name: "QA 2" }).catch(() => undefined);
@@ -114,7 +114,7 @@ describe("project tools", () => {
     const c = client();
     const create = vi.fn(async () => ({ id: 102, name: "Review", boardId: 10 }));
     const h = toolHarness(registerProjectTools, { ...c, columns: { ...c.columns, create } });
-    await h.call("weeek_update_column", { column: "Done", board: 10, name: "Shipped" }).catch(() => undefined); // warms board-columns:10
+    await h.resolver.resolve({ kind: "column", value: "Done", scope: { boardId: 10 } }); // warms board-columns:10
     await h.call("weeek_create_column", { board: 10, name: "Review" });
     expect(create).toHaveBeenCalledWith({ name: "Review", boardId: 10 });
     await h.call("weeek_update_column", { column: "Review", board: 10, name: "In review" }).catch(() => undefined);

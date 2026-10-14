@@ -43,4 +43,9 @@ describe("ColumnsApi", () => {
     await new ColumnsApi(httpWith(g)).move({ columnId: 100, upperColumnId: null });
     expect(sent(g).json()).toEqual({ upperBoardColumnId: null });
   });
+
+  it("list coerces ids and defaults a missing name", async () => {
+    const f = jsonFetch(200, { success: true, boardColumns: [{ id: "100", boardId: "10" }] });
+    expect(await new ColumnsApi(httpWith(f)).list(10)).toEqual([{ id: 100, name: "", boardId: 10 }]);
+  });
 });

@@ -10,6 +10,10 @@ const rawTask = {
   timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
   authorId: "u1", createdAt: "2026-07-01T10:00:00Z", startDate: "2026-07-20", duration: 60,
 };
+const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
+const entryBody = { ...entryFields, isOvertime: 1 };
+const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
+const expectedEntry = { id: "te9", ...entryFields, comment: "" };
 // The same task after toTask: what every tool returns to the model.
 const normalisedTask = {
   id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
@@ -192,21 +196,16 @@ describe("TasksApi", () => {
     expect(sent(f).url).toBe(`https://api.weeek.net/public/v1/tm/tasks/78/${segment}`);
   });
 
-  const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
-  const entryBody = { ...entryFields, isOvertime: 1 };
-  const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
-  const entry = { id: "te9", ...entryFields, comment: "" };
-
   it("addTimeEntry POSTs the four fields and returns the entry", async () => {
     const f = jsonFetch(200, { success: true, data: rawEntry });
-    expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(entry);
+    expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(expectedEntry);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries");
     expect(sent(f).json()).toEqual(entryBody);
   });
 
   it("updateTimeEntry PUTs the four fields to the entry's path", async () => {
     const f = jsonFetch(200, { success: true, data: rawEntry });
-    expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(entry);
+    expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(expectedEntry);
     expect(sent(f).init.method).toBe("PUT");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
     expect(sent(f).json()).toEqual(entryBody);
@@ -223,5 +222,12 @@ describe("TasksApi", () => {
     expect(await new TasksApi(httpWith(f)).removeTimeEntry({ taskId: 78, timeEntryId: "te9" })).toEqual({ success: true });
     expect(sent(f).init.method).toBe("DELETE");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
+  });
+
+  it("get drops malformed locations and timeEntries instead of failing", async () => {
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, locations: "x", timeEntries: null } });
+    const t = await new TasksApi(httpWith(f)).get(78);
+    expect(t.locations).toEqual([]);
+    expect(t.timeEntries).toEqual([]);
   });
 });

@@ -38,6 +38,7 @@ describe("workspace tools", () => {
     const h = toolHarness(registerWorkspaceTools, { ...c, portfolios: { ...c.portfolios, create } });
     const before = await h.call("weeek_get_portfolio", { portfolio: "Internal" }); // caches an empty search result
     expect(before.isError).toBe(true);
+    expect(reply(before).error).toMatch(/could not resolve portfolio "Internal"/);
     await h.call("weeek_create_portfolio", { name: "Internal", parent: "Clients" });
     expect(create).toHaveBeenCalledWith({ name: "Internal", parentId: 7 });
     await h.call("weeek_get_portfolio", { portfolio: "Internal" });

@@ -43,4 +43,9 @@ describe("BoardsApi", () => {
     await new BoardsApi(httpWith(g)).move({ boardId: 10, upperBoardId: null });
     expect(sent(g).json()).toEqual({ upperBoardId: null });
   });
+
+  it("list coerces ids and defaults a missing name and privacy", async () => {
+    const f = jsonFetch(200, { success: true, boards: [{ id: "10", projectId: "2" }] });
+    expect(await new BoardsApi(httpWith(f)).list(2)).toEqual([{ id: 10, name: "", projectId: 2, isPrivate: false }]);
+  });
 });

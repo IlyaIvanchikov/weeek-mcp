@@ -367,7 +367,7 @@ describe("task tools", () => {
   it("weeek_list_tasks rejects a priority outside the four names", async () => {
     const h = harness({ tasks: { list: vi.fn() } });
     // The harness parses synchronously, so wrap the call to observe the zod rejection.
-    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow();
+    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow(/priority/);
   });
 
   it("create_task sends the priority code, the type and the parent", async () => {
@@ -431,5 +431,12 @@ describe("task tools", () => {
     const h = harness({ ...baseClient, tasks: { create } });
     await h.get("weeek_create_task")!({ title: "x", project: "Marketing", priority: "low" });
     expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, priority: 0 });
+  });
+
+  it("weeek_list_tasks sends completed and all both as 1 when both are set", async () => {
+    const list = listStub();
+    const h = harness({ tasks: { list } });
+    await h.get("weeek_list_tasks")!({ completed: true, all: true });
+    expect(list.mock.calls[0][0]).toMatchObject({ completed: 1, all: 1 });
   });
 });

@@ -47,4 +47,11 @@ describe("PortfoliosApi", () => {
     expect(sent(f).init.method).toBe("DELETE");
     expect(sent(f).url).toBe(`${base}/7`);
   });
+
+  it("list forwards parentId and offset and reports hasMore", async () => {
+    const f = jsonFetch(200, { success: true, data: [portfolio], hasMore: true });
+    const page = await new PortfoliosApi(httpWith(f)).list({ parentId: 3, limit: 1, offset: 5 });
+    expect(page.hasMore).toBe(true);
+    expect(sent(f).url).toBe(`${base}?parentId=3&limit=1&offset=5`);
+  });
 });

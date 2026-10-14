@@ -23,7 +23,7 @@ describe("operation registry", () => {
     expect(operations.tasks.removeComment.path).toBe("/tm/tasks/{taskId}/comments/{commentId}");
     expect(operations.columns.move.path).toBe("/tm/board-columns/{columnId}/move");
     for (const op of listOperations()) {
-      for (const param of op.path.match(/\{[^}]+\}/g) ?? []) expect(param).toMatch(/^\{[a-z][A-Za-z0-9]*\}$/);
+      for (const param of op.path.match(/\{[^}]+\}/g) ?? []) expect(param).toMatch(/^\{[a-z][A-Za-z]*Id\}$/);
     }
   });
 });
