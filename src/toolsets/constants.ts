@@ -4,6 +4,7 @@
 // per release phase: projects, custom-fields, crm.
 // time: the timer and time entries, carved out so the default stays small.
 // projects: projects, boards, columns, portfolios, tags, workspace — the structure around tasks.
-export const toolsetNames = ["tasks", "time", "projects", "all"] as const;
+// custom-fields: field and option administration in every scope; values on tasks stay in tasks.
+export const toolsetNames = ["tasks", "time", "projects", "custom-fields", "all"] as const;
 // parseToolsets returns this as ToolsetName[], so a misspelt member fails the type check there.
 export const defaultToolsets = ["tasks"] as const;
