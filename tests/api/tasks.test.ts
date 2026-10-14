@@ -193,6 +193,7 @@ describe("TasksApi", () => {
   });
 
   const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
+  const entryBody = { ...entryFields, isOvertime: 1 };
   const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
   const entry = { id: "te9", ...entryFields, comment: "" };
 
@@ -200,7 +201,7 @@ describe("TasksApi", () => {
     const f = jsonFetch(200, { success: true, data: rawEntry });
     expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(entry);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries");
-    expect(sent(f).json()).toEqual(entryFields);
+    expect(sent(f).json()).toEqual(entryBody);
   });
 
   it("updateTimeEntry PUTs the four fields to the entry's path", async () => {
@@ -208,7 +209,13 @@ describe("TasksApi", () => {
     expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(entry);
     expect(sent(f).init.method).toBe("PUT");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
-    expect(sent(f).json()).toEqual(entryFields);
+    expect(sent(f).json()).toEqual(entryBody);
+  });
+
+  it("sends a false isOvertime as 0", async () => {
+    const f = jsonFetch(200, { success: true, data: rawEntry });
+    await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: { ...entryFields, isOvertime: false } });
+    expect(sent(f).json()).toEqual({ ...entryBody, isOvertime: 0 });
   });
 
   it("removeTimeEntry DELETEs the entry's path", async () => {

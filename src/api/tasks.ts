@@ -1,5 +1,6 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
+import { apiFlag } from "./requests.js";
 import { pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
@@ -26,6 +27,11 @@ const optionalString = (value: unknown): string | null => (value == null ? null 
 
 function toLocation(raw: any): TaskLocation {
   return { projectId: Number(raw.projectId), boardId: optionalNumber(raw.boardId), boardColumnId: optionalNumber(raw.boardColumnId) };
+}
+
+/** The spec wants isOvertime as 0 or 1 on the wire, not a boolean. */
+function timeEntryBody(entry: TimeEntryFields) {
+  return { ...entry, isOvertime: apiFlag(entry.isOvertime) };
 }
 
 export function toTimeEntry(raw: any): TimeEntry {
@@ -196,12 +202,12 @@ export class TasksApi {
   }
 
   async addTimeEntry({ taskId, entry }: AddTimeEntryOptions): Promise<TimeEntry> {
-    const json = await this.http.execute<{ data: unknown }>(ops.addTimeEntry, { params: { taskId }, body: entry });
+    const json = await this.http.execute<{ data: unknown }>(ops.addTimeEntry, { params: { taskId }, body: timeEntryBody(entry) });
     return toTimeEntry(json.data);
   }
 
   async updateTimeEntry({ taskId, timeEntryId, entry }: UpdateTimeEntryOptions): Promise<TimeEntry> {
-    const json = await this.http.execute<{ data: unknown }>(ops.updateTimeEntry, { params: { taskId, timeEntryId }, body: entry });
+    const json = await this.http.execute<{ data: unknown }>(ops.updateTimeEntry, { params: { taskId, timeEntryId }, body: timeEntryBody(entry) });
     return toTimeEntry(json.data);
   }
 
