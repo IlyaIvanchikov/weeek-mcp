@@ -60,4 +60,24 @@ describe("NameCache", () => {
     expect(await cache.get("projects", load)).toEqual(projects);
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  describe.each([
+    ["invalidate", (cache: NameCache) => cache.invalidate("projects")],
+    ["invalidatePrefix", (cache: NameCache) => cache.invalidatePrefix("projects")],
+  ])("%s while a load is in flight", (_name, invalidateKey) => {
+    it("drops that load, so the next get loads again", async () => {
+      const cache = new NameCache(100000, () => 0);
+      const staleProjects = [{ id: 1, name: "Old" }];
+      const freshProjects = [{ id: 2, name: "New" }];
+      let resolveStale!: (projects: typeof staleProjects) => void;
+      const staleLoad = vi.fn(() => new Promise<typeof staleProjects>((resolve) => { resolveStale = resolve; }));
+      const freshLoad = vi.fn(async () => freshProjects);
+      const pending = cache.get("projects", staleLoad);
+      invalidateKey(cache);
+      resolveStale(staleProjects);
+      await pending;
+      expect(await cache.get("projects", freshLoad)).toEqual(freshProjects);
+      expect(freshLoad).toHaveBeenCalledTimes(1);
+    });
+  });
 });
