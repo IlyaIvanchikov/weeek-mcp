@@ -31,13 +31,14 @@ export function isToolsetName(value: string): value is ToolsetName {
 }
 
 export function parseToolsets(raw: string | undefined): ToolsetName[] {
-  const names = (raw ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0);
+  const names = [...new Set((raw ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0))];
   if (names.length === 0) return [...defaultToolsets];
-  const unknown = names.find((name) => !isToolsetName(name));
-  if (unknown !== undefined) {
-    throw new Error(`invalid config: WEEEK_TOOLSETS: unknown toolset "${unknown}"; valid values: ${toolsetNames.join(", ")}`);
+  const known: ToolsetName[] = [];
+  for (const name of names) {
+    if (!isToolsetName(name)) throw new Error(`invalid config: WEEEK_TOOLSETS: unknown toolset "${name}"; valid values: ${toolsetNames.join(", ")}`);
+    known.push(name);
   }
-  return [...new Set(names.filter(isToolsetName))];
+  return known;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {

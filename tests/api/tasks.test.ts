@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { TasksApi } from "../../src/api/tasks.js";
-import { jsonFetch, httpWith, sent } from "../helpers/http.js";
+import { TasksApi, boardFieldSamplePageSize } from "../../src/api/tasks.js";
+import { jsonFetch, httpWith, sent, type FetchStub } from "../helpers/http.js";
 
 const rawTask = {
   id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
@@ -10,6 +10,10 @@ const rawTask = {
   timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
   authorId: "u1", createdAt: "2026-07-01T10:00:00Z", startDate: "2026-07-20", duration: 60,
 };
+const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
+const entryBody = { ...entryFields, isOvertime: 1 };
+const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
+const expectedEntry = { id: "te9", ...entryFields, comment: "" };
 // The same task after toTask: what every tool returns to the model.
 const normalisedTask = {
   id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
@@ -19,6 +23,7 @@ const normalisedTask = {
   locations: [{ projectId: 2, boardId: 3, boardColumnId: 8 }],
   timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
   attachments: [],
+  customFields: [],
 };
 
 describe("TasksApi", () => {
@@ -132,9 +137,9 @@ describe("TasksApi", () => {
     expect(sent(g).json()).toEqual({ markdown: "top" });
   });
 
-  it("removeComment DELETEs and accepts an empty 204 body", async () => {
-    const f = vi.fn(async () => new Response(null, { status: 204 }));
-    await expect(new TasksApi(httpWith(f)).removeComment({ taskId: 78, commentId: 9 })).resolves.toBeUndefined();
+  it("removeComment DELETEs, accepts an empty 204 body and answers with the success envelope", async () => {
+    const f = vi.fn<FetchStub>(async () => new Response(null, { status: 204 }));
+    expect(await new TasksApi(httpWith(f)).removeComment({ taskId: 78, commentId: 9 })).toEqual({ success: true });
     expect(sent(f).init.method).toBe("DELETE");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/comments/9");
   });
@@ -192,21 +197,16 @@ describe("TasksApi", () => {
     expect(sent(f).url).toBe(`https://api.weeek.net/public/v1/tm/tasks/78/${segment}`);
   });
 
-  const entryFields = { userId: "u1", date: "2026-07-20", duration: 45, isOvertime: true };
-  const entryBody = { ...entryFields, isOvertime: 1 };
-  const rawEntry = { id: "te9", ...entryFields, comment: "", type: 1 };
-  const entry = { id: "te9", ...entryFields, comment: "" };
-
   it("addTimeEntry POSTs the four fields and returns the entry", async () => {
     const f = jsonFetch(200, { success: true, data: rawEntry });
-    expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(entry);
+    expect(await new TasksApi(httpWith(f)).addTimeEntry({ taskId: 78, entry: entryFields })).toEqual(expectedEntry);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries");
     expect(sent(f).json()).toEqual(entryBody);
   });
 
   it("updateTimeEntry PUTs the four fields to the entry's path", async () => {
     const f = jsonFetch(200, { success: true, data: rawEntry });
-    expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(entry);
+    expect(await new TasksApi(httpWith(f)).updateTimeEntry({ taskId: 78, timeEntryId: "te9", entry: entryFields })).toEqual(expectedEntry);
     expect(sent(f).init.method).toBe("PUT");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
     expect(sent(f).json()).toEqual(entryBody);
@@ -223,5 +223,70 @@ describe("TasksApi", () => {
     expect(await new TasksApi(httpWith(f)).removeTimeEntry({ taskId: 78, timeEntryId: "te9" })).toEqual({ success: true });
     expect(sent(f).init.method).toBe("DELETE");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/time-entries/te9");
+  });
+
+  it("get drops malformed locations and timeEntries instead of failing", async () => {
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, locations: "x", timeEntries: null } });
+    const t = await new TasksApi(httpWith(f)).get(78);
+    expect(t.locations).toEqual([]);
+    expect(t.timeEntries).toEqual([]);
+  });
+
+  it("getFields reads a task's fields with their options off GET /tm/tasks/{id}", async () => {
+    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Review", color: "blue" }], value: null };
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, customFields: [rawField] } });
+    expect(await new TasksApi(httpWith(f)).getFields(78)).toEqual([{ id: rawField.id, name: "Stage", type: "select", config: null, options: rawField.options }]);
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
+  });
+
+  describe("sampleBoardFields", () => {
+    const rawFieldNamed = (name: string, n: number) => ({ id: `0b1e4d7c-${n}${n}${n}${n}-4aaa-8bbb-00000000000${n}`, name, type: "text", options: [], value: "x" });
+    const globalField = rawFieldNamed("G", 1);
+    const project2Field = rawFieldNamed("P2", 2);
+    const board3Field = rawFieldNamed("B3", 3);
+    const project9Field = rawFieldNamed("X9", 4);
+    const normalised = (raw: typeof globalField) => ({ id: raw.id, name: raw.name, type: "text", config: null, options: [] });
+
+    it("keeps the fields every task of the page carries and collects every project they sit in", async () => {
+      const taskA = { ...rawTask, locations: [{ projectId: 2, boardId: 3 }, { projectId: 9, boardId: 1 }], customFields: [globalField, project2Field, board3Field, project9Field] };
+      const taskB = { ...rawTask, locations: [{ projectId: 2, boardId: 3 }], customFields: [globalField, project2Field, board3Field] };
+      const f = jsonFetch(200, { success: true, tasks: [taskA, taskB] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({
+        projectIds: [2, 9],
+        fields: [globalField, project2Field, board3Field].map(normalised),
+      });
+      expect(sent(f).url).toBe(`https://api.weeek.net/public/v1/tm/tasks?boardId=3&perPage=${boardFieldSamplePageSize}&all=1`);
+      expect(boardFieldSamplePageSize).toBe(20);
+    });
+
+    it("falls back to a task's own projectId when it has no locations", async () => {
+      const f = jsonFetch(200, { success: true, tasks: [{ ...rawTask, projectId: 7, locations: [], customFields: [globalField] }] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({ projectIds: [7], fields: [normalised(globalField)] });
+    });
+
+    it("is null for a board without tasks", async () => {
+      const f = jsonFetch(200, { success: true, tasks: [] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toBeNull();
+    });
+  });
+
+  it("get shows custom-field values with option ids turned into option names", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "o1", name: "Review", color: "blue" }], value: "o1" };
+    const tags = { id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Areas", type: "multiselect", options: [{ id: "a", name: "API", color: "red" }], value: ["a", "zz"] };
+    const estimate = { id: "0b1e4d7c-3333-4aaa-8bbb-000000000003", name: "Estimate", type: "number", options: [], value: 5 };
+    const empty = { id: "0b1e4d7c-4444-4aaa-8bbb-000000000004", name: "Notes", type: "text", options: [], value: null };
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, customFields: [stage, tags, estimate, empty] } });
+    expect((await new TasksApi(httpWith(f)).get(78)).customFields).toEqual([
+      { id: stage.id, name: "Stage", type: "select", value: "Review" },
+      { id: tags.id, name: "Areas", type: "multiselect", value: ["API", "zz"] },
+      { id: estimate.id, name: "Estimate", type: "number", value: 5 },
+      { id: empty.id, name: "Notes", type: "text", value: null },
+    ]);
+  });
+
+  it("create sends customFields when given", async () => {
+    const f = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, customFields: { "0b1e4d7c-1111-4aaa-8bbb-000000000001": "o1" } });
+    expect(sent(f).json()).toEqual({ title: "T", locations: [{ projectId: 1 }], customFields: { "0b1e4d7c-1111-4aaa-8bbb-000000000001": "o1" } });
   });
 });

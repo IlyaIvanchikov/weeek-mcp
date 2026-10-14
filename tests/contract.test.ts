@@ -22,20 +22,8 @@ const registered = new Set(listOperations().map((o) => normalise(o.method, o.pat
 // its phase lands; delete the constant in Phase 4. An operation in BOTH this list and the
 // registry fails the test below, so the list cannot rot.
 const notYetImplemented: string[] = [
-  // ── Phase 3 · custom fields (global, project, board, funnel) ────────────
-  "GET /tm/custom-fields", "POST /tm/custom-fields", "PUT /tm/custom-fields/{}", "DELETE /tm/custom-fields/{}",
-  "POST /tm/custom-fields/{}/transfer-to-project", "POST /tm/custom-fields/{}/transfer-to-board",
-  "POST /tm/custom-fields/{}/options", "PUT /tm/custom-fields/{}/options/{}", "DELETE /tm/custom-fields/{}/options/{}", "POST /tm/custom-fields/{}/options/{}/move",
-  "POST /tm/projects/{}/custom-fields", "PUT /tm/projects/{}/custom-fields/{}", "DELETE /tm/projects/{}/custom-fields/{}",
-  "POST /tm/projects/{}/custom-fields/{}/transfer-to-task-manager", "POST /tm/projects/{}/custom-fields/{}/transfer-to-project", "POST /tm/projects/{}/custom-fields/{}/transfer-to-board",
-  "POST /tm/projects/{}/custom-fields/{}/options", "PUT /tm/projects/{}/custom-fields/{}/options/{}", "DELETE /tm/projects/{}/custom-fields/{}/options/{}", "POST /tm/projects/{}/custom-fields/{}/options/{}/move",
-  "POST /tm/boards/{}/custom-fields", "PUT /tm/boards/{}/custom-fields/{}", "DELETE /tm/boards/{}/custom-fields/{}",
-  "POST /tm/boards/{}/custom-fields/{}/transfer-to-task-manager", "POST /tm/boards/{}/custom-fields/{}/transfer-to-project", "POST /tm/boards/{}/custom-fields/{}/transfer-to-board",
-  "POST /tm/boards/{}/custom-fields/{}/options", "PUT /tm/boards/{}/custom-fields/{}/options/{}", "DELETE /tm/boards/{}/custom-fields/{}/options/{}", "POST /tm/boards/{}/custom-fields/{}/options/{}/move",
-  "POST /crm/funnels/{}/custom-fields", "PUT /crm/funnels/{}/custom-fields/{}", "DELETE /crm/funnels/{}/custom-fields/{}", "POST /crm/funnels/{}/custom-fields/{}/move",
-  "POST /crm/funnels/{}/custom-fields/{}/options", "PUT /crm/funnels/{}/custom-fields/{}/options/{}", "DELETE /crm/funnels/{}/custom-fields/{}/options/{}", "POST /crm/funnels/{}/custom-fields/{}/options/{}/move",
   // ── Phase 4 · CRM ───────────────────────────────────────────────────────
-  "GET /crm/funnels", "POST /crm/funnels", "GET /crm/funnels/{}", "PUT /crm/funnels/{}", "DELETE /crm/funnels/{}",
+  "POST /crm/funnels", "GET /crm/funnels/{}", "PUT /crm/funnels/{}", "DELETE /crm/funnels/{}",
   "GET /crm/funnels/{}/statuses", "POST /crm/funnels/{}/statuses", "GET /crm/statuses/{}", "PUT /crm/statuses/{}", "DELETE /crm/statuses/{}",
   "GET /crm/statuses/{}/deals", "POST /crm/statuses/{}/deals",
   "GET /crm/deals/{}", "PUT /crm/deals/{}", "PATCH /crm/deals/{}", "DELETE /crm/deals/{}",

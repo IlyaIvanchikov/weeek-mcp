@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolContext } from "../toolsets/types.js";
-import type { NewTask, ProjectSummary, TaskPriority, TaskType, WeeekTask } from "../client.js";
+import type { CustomField, NewTask, ProjectSummary, WeeekTask } from "../client.js";
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
 import { parseDay } from "../dates.js";
@@ -10,7 +10,8 @@ import { taskPriorities, taskTypes } from "../api/constants.js";
 import { priorityCode } from "../api/priority.js";
 import { apiFlag } from "../api/requests.js";
 import { destructiveAnnotations } from "./constants.js";
-import { confirmation, dayMonthYear, nameOrId, nameOrIdList, page, taskId } from "./inputs.js";
+import { confirmation, dayMonthYear, nameOrId, nameOrIdListCap, page, taskId } from "./inputs.js";
+import { fieldValues, encodeTaskFields } from "./field-values.js";
 import { registerJsonTool } from "./json-tool.js";
 import { jsonReply, imageReply, errorReply } from "./reply.js";
 
@@ -25,12 +26,32 @@ export const MAX_AUTO_PAGES = 20;
 // deliberately does not demand a uuid it never promised.
 const ATTACHMENT_ID = /^[A-Za-z0-9_-]+$/;
 
-interface CreateInput {
-  title: string; project: string | number;
-  column?: string | number; assignee?: string | number;
-  due?: string; description?: string;
-  priority?: TaskPriority; type?: TaskType; parent?: number;
-}
+const createShape = {
+  title: z.string(),
+  project: nameOrId,
+  column: nameOrId.optional(),
+  assignee: nameOrId.optional(),
+  due: z.string().optional(),
+  description: z.string().optional(),
+  priority: z.enum(taskPriorities).optional(),
+  type: z.enum(taskTypes).optional(),
+  parent: z.number().int().optional().describe("Id of the task this one becomes a subtask of."),
+  fields: fieldValues.optional(),
+};
+type CreateInput = z.infer<z.ZodObject<typeof createShape>>;
+
+const updateShape = {
+  id: taskId,
+  title: z.string().optional(),
+  due: z.string().optional(),
+  start: z.string().optional(),
+  priority: z.enum(taskPriorities).optional(),
+  type: z.enum(taskTypes).optional(),
+  duration: z.number().int().min(0).optional(),
+  fields: fieldValues.optional(),
+  tags: z.array(nameOrId).max(nameOrIdListCap).optional().describe("Replaces the task's tags; an empty list clears them."),
+};
+type UpdateInput = z.infer<z.ZodObject<typeof updateShape>>;
 
 export async function buildNewTask(resolver: Resolver, input: CreateInput): Promise<NewTask> {
   const projectId = await resolver.resolve({ kind: "project", value: input.project });
@@ -42,17 +63,26 @@ export async function buildNewTask(resolver: Resolver, input: CreateInput): Prom
   if (input.priority !== undefined) newTask.priority = priorityCode(input.priority);
   if (input.type !== undefined) newTask.type = input.type;
   if (input.parent !== undefined) newTask.parentId = input.parent;
+  if (input.fields !== undefined) {
+    // A new task can carry global and project fields; a board's own fields are set with weeek_update_task once the task exists.
+    const fields = [
+      ...(await resolver.list({ kind: "customField" })),
+      ...(await resolver.list({ kind: "customField", scope: { fieldScope: { kind: "project", projectId } } })),
+    ];
+    newTask.customFields = await encodeTaskFields({ resolver, fields, values: input.fields });
+  }
   return newTask;
 }
 
-interface UpdateInput {
-  title?: string; due?: string; start?: string;
-  priority?: TaskPriority; type?: TaskType; duration?: number;
-  tags?: Array<string | number>;
+export interface BuildTaskPatchOptions {
+  resolver: Resolver;
+  input: UpdateInput;
+  /** The task's own fields — what `fields` names are resolved against; [] when none are given. */
+  taskFields: CustomField[];
 }
 
 /** The PUT body for weeek_update_task: only the fields given, names resolved to ids. */
-export async function buildTaskPatch(resolver: Resolver, input: UpdateInput): Promise<Record<string, unknown>> {
+export async function buildTaskPatch({ resolver, input, taskFields }: BuildTaskPatchOptions): Promise<Record<string, unknown>> {
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
   // `dayFrom` has set the due date since 0.1 although the spec names the field `dueDate`;
@@ -63,20 +93,9 @@ export async function buildTaskPatch(resolver: Resolver, input: UpdateInput): Pr
   if (input.type !== undefined) patch.type = input.type;
   if (input.duration !== undefined) patch.duration = input.duration;
   if (input.tags !== undefined) patch.tags = await Promise.all(input.tags.map((value) => resolver.resolve({ kind: "tag", value })));
+  if (input.fields !== undefined) patch.customFields = await encodeTaskFields({ resolver, fields: taskFields, values: input.fields });
   return patch;
 }
-
-const createShape = {
-  title: z.string(),
-  project: nameOrId,
-  column: nameOrId.optional(),
-  assignee: nameOrId.optional(),
-  due: z.string().optional(),
-  description: z.string().optional(),
-  priority: z.enum(taskPriorities).optional(),
-  type: z.enum(taskTypes).optional(),
-  parent: z.number().int().optional().describe("Id of the task this one becomes a subtask of."),
-};
 
 const listShape = {
   projectId: z.number().int().optional(),
@@ -165,7 +184,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
   });
 
   registerJsonTool(server, "weeek_get_task", {
-    description: "Get one WEEEK task by id: assignees, watchers, parent and subtasks, priority, dates, tags, locations, time entries and attachments.",
+    description: "Get one WEEEK task by id: assignees, watchers, parent and subtasks, priority, dates, tags, locations, time entries, attachments and custom-field values (`customFields`, option names shown).",
     inputSchema: { id: taskId },
   }, async (args) => client.tasks.get(args.id));
 
@@ -210,7 +229,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_create_task", {
     description:
-      "Create a WEEEK task. Accepts project/column/assignee by NAME or id, a natural-language `due` date, a priority (low, medium, high, hold), a type (action, meet, call) and a `parent` task id for a subtask. One call — no need to look up ids first. Omit `assignee` to self-assign; to change assignees later use weeek_add_assignees / weeek_remove_assignees.",
+      "Create a WEEEK task. Accepts project/column/assignee by NAME or id, a natural-language `due` date, a priority (low, medium, high, hold), a type (action, meet, call), a `parent` task id for a subtask, and custom-field values in `fields` by field name (global and project fields). One call — no need to look up ids first. Omit `assignee` to self-assign; to change assignees later use weeek_add_assignees / weeek_remove_assignees.",
     inputSchema: createShape,
   }, async (args) => client.tasks.create(await buildNewTask(resolver, args)));
 
@@ -239,18 +258,12 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_update_task", {
     description:
-      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, and `tags` by name or id (replaces the task's tags; needs at least one name or id). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
-    inputSchema: {
-      id: taskId,
-      title: z.string().optional(),
-      due: z.string().optional(),
-      start: z.string().optional(),
-      priority: z.enum(taskPriorities).optional(),
-      type: z.enum(taskTypes).optional(),
-      duration: z.number().int().min(0).optional(),
-      tags: nameOrIdList.optional(),
-    },
-  }, async (args) => client.tasks.update(args.id, await buildTaskPatch(resolver, args)));
+      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, `tags` by name or id (replaces the task's tags; an empty list clears them), and `fields`: custom-field values by field name (select options and members by name too; null clears; other fields keep their values). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
+    inputSchema: updateShape,
+  }, async (args) => {
+    const taskFields = args.fields === undefined ? [] : await client.tasks.getFields(args.id);
+    return client.tasks.update(args.id, await buildTaskPatch({ resolver, input: args, taskFields }));
+  });
 
   registerJsonTool(server, "weeek_delete_task", {
     description:

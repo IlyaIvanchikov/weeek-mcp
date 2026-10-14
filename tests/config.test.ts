@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadConfig, parseToolsets } from "../src/config.js";
+import { isToolsetName, loadConfig, parseToolsets } from "../src/config.js";
 import { toolsetNames } from "../src/toolsets/constants.js";
 
 describe("loadConfig", () => {
@@ -31,9 +31,10 @@ describe("WEEEK_TOOLSETS", () => {
   it("rejects an unknown toolset and names the valid ones", () => {
     expect(() => loadConfig({ WEEEK_TOOLSETS: "tasks,crm" })).toThrow(new RegExp(`WEEEK_TOOLSETS.*"crm".*${toolsetNames.join(", ")}`));
   });
-  it("keeps the parsed names typed without a cast", () => {
-    const names = parseToolsets("tasks");
-    // A name the guard did not admit cannot reach here; the array is a ToolsetName[] by construction.
-    expect(names.every((name) => toolsetNames.includes(name))).toBe(true);
+  it("validates each name once and keeps the parsed names typed", () => {
+    expect(parseToolsets("Tasks, tasks ,TIME")).toEqual(["tasks", "time"]);
+    expect(toolsetNames.every(isToolsetName)).toBe(true);
+    expect(isToolsetName("crm")).toBe(false);
+    expect(isToolsetName("Tasks")).toBe(false);
   });
 });

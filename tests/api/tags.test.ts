@@ -32,6 +32,7 @@ describe("TagsApi", () => {
     expect(sent(f, 0).url).toBe(`${base}/5`);
     expect(sent(f, 0).json()).toEqual({ title: "urgent", color: "#f00" });
     expect(sent(f, 1).url).toBe(`${base}/5`);
+    expect(sent(f, 1).init.method).toBe("GET");
   });
 
   it("remove DELETEs the tag", async () => {

@@ -38,7 +38,7 @@ describe("time tools", () => {
   it("weeek_add_time_entry rejects more than a day of minutes before any call", async () => {
     const addTimeEntry = vi.fn();
     const h = toolHarness(registerTimeTools, { ...client(), tasks: { addTimeEntry } });
-    expect(() => h.call("weeek_add_time_entry", { id: 78, date: "2026-07-20", minutes: 1441 })).toThrow();
+    expect(() => h.call("weeek_add_time_entry", { id: 78, date: "2026-07-20", minutes: 1441 })).toThrow(/minutes/);
     expect(addTimeEntry).not.toHaveBeenCalled();
   });
 

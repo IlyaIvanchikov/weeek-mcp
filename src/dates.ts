@@ -1,5 +1,12 @@
 import * as chrono from "chrono-node";
 
+/** A natural-language date or time as an ISO 8601 instant, for datetime custom fields. */
+export function parseDateTime(input: string, now: Date = new Date()): string {
+  const dt = chrono.parseDate(input, now, { forwardDate: true });
+  if (!dt) throw new Error(`could not parse date: "${input}"`);
+  return dt.toISOString();
+}
+
 export function parseDay(input: string, now: Date = new Date()): string {
   const dt = chrono.parseDate(input, now, { forwardDate: true });
   if (!dt) throw new Error(`could not parse date: "${input}"`);

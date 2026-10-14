@@ -1,25 +1,28 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./responses.js";
+import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { apiFlag } from "./requests.js";
 import { projectStatuses } from "./constants.js";
-import type { NewProject, Project, ProjectStatus, ProjectUpdate, SuccessResponse } from "./types.js";
+import { toCustomField } from "./custom-fields.js";
+import type { NewProject, Project, ProjectUpdate, SuccessResponse } from "./types.js";
 
 export interface UpdateProjectOptions { projectId: number; update: ProjectUpdate; }
 export interface SetArchivedOptions { projectId: number; archived: boolean; }
 
 const ops = operations.projects;
 
-export function toProject(raw: any): Project {
+export function toProject(raw: unknown): Project {
+  const r = asRecord(raw);
   return {
-    id: Number(raw.id),
-    name: String(raw.name ?? ""),
-    description: raw.description == null ? null : String(raw.description),
-    color: raw.color == null ? null : String(raw.color),
-    status: (projectStatuses as readonly number[]).includes(raw.status) ? (raw.status as ProjectStatus) : null,
-    isPrivate: Boolean(raw.isPrivate),
-    portfolioId: raw.portfolioId == null ? null : Number(raw.portfolioId),
-    team: Array.isArray(raw.team) ? raw.team.map(String) : [],
+    id: Number(r.id),
+    name: String(r.name ?? ""),
+    description: r.description == null ? null : String(r.description),
+    color: r.color == null ? null : String(r.color),
+    status: isOneOf(projectStatuses, r.status) ? r.status : null,
+    isPrivate: Boolean(r.isPrivate),
+    portfolioId: r.portfolioId == null ? null : Number(r.portfolioId),
+    team: Array.isArray(r.team) ? r.team.map(String) : [],
+    customFields: Array.isArray(r.customFields) ? r.customFields.map(toCustomField) : [],
   };
 }
 

@@ -1,5 +1,5 @@
 import type { BinaryResponse } from "../http.js";
-import type { attachmentServices, projectStatuses, taskPriorities, taskTypes } from "./constants.js";
+import type { attachmentServices, booleanStyles, fieldTypes, numberFormats, optionColors, projectStatuses, taskPriorities, taskTypes } from "./constants.js";
 
 /** What an endpoint answers when it returns no entity, only the success flag. */
 export interface SuccessResponse { success: boolean; }
@@ -26,6 +26,8 @@ export interface DownloadAttachmentOptions { attachment: Attachment; maxBytes: n
 
 export type TaskPriority = (typeof taskPriorities)[number];
 export type TaskType = (typeof taskTypes)[number];
+/** A wire priority is an index into taskPriorities (0 low … 3 hold); derived from the tuple so the two cannot drift. */
+export type TaskPriorityCode = Exclude<Partial<typeof taskPriorities>["length"], (typeof taskPriorities)["length"]>;
 
 export interface TaskLocation { projectId: number; boardId: number | null; boardColumnId: number | null; }
 
@@ -67,15 +69,18 @@ export interface WeeekTask {
   locations: TaskLocation[];
   timeEntries: TimeEntry[];
   attachments: Attachment[];
+  customFields: TaskFieldValue[];
 }
 
 export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
   /** Wire code; use priorityCode() to build it from a name. */
-  priority?: number;
+  priority?: TaskPriorityCode;
   type?: TaskType;
   parentId?: number;
+  /** Field ids to wire values; built by encodeTaskFields. */
+  customFields?: Record<string, unknown>;
 }
 
 export type ProjectStatus = (typeof projectStatuses)[number];
@@ -85,6 +90,8 @@ export interface Project {
   status: ProjectStatus | null; isPrivate: boolean; portfolioId: number | null;
   /** Member ids. */
   team: string[];
+  /** The project's own fields; global ones are not repeated here. */
+  customFields: CustomField[];
 }
 /** What weeek_list_projects returns; description and team come from weeek_get_project. */
 export type ProjectSummary = Pick<Project, "id" | "name" | "isPrivate" | "status" | "portfolioId">;
@@ -113,3 +120,51 @@ export interface Workspace { id: number; title: string; description: string | nu
 
 /** The token owner, as GET /user/me reports it. `name` is joined the way members' names are. */
 export interface Profile { id: string; name: string; email: string; language: string | null; timeZone: string | null; }
+
+export type FieldType = (typeof fieldTypes)[number];
+export type OptionColor = (typeof optionColors)[number];
+export type NumberFormat = (typeof numberFormats)[number];
+export type BooleanStyle = (typeof booleanStyles)[number];
+
+/** A number field's settings as the API spells them; `currency` is a WEEEK currency id (1–10; GET /crm/currencies names them in Phase 4). */
+export interface NumberFieldConfig { type: NumberFormat; precision: number | null; currency?: number; }
+export interface BooleanFieldConfig { type: BooleanStyle; }
+/** Only number and boolean fields carry settings; the two are told apart by `type`. */
+export type FieldConfig = NumberFieldConfig | BooleanFieldConfig;
+
+/** What a caller may pass for one field, and what a task shows back: option ids read as option names. null clears. */
+export type FieldValue = string | number | boolean | string[] | null;
+/** A custom field as a task carries it. */
+export interface TaskFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
+export interface CustomFieldOption { id: string; name: string; color: string; }
+export interface CustomField {
+  id: string;
+  name: string;
+  /** null for a type this server does not know; the value is still shown. */
+  type: FieldType | null;
+  config: FieldConfig | null;
+  /** Only select and multiselect fields have any. */
+  options: CustomFieldOption[];
+}
+export interface NewCustomField { name: string; type: FieldType; config?: FieldConfig; }
+/** PUT takes either or both; the type cannot change. */
+export interface CustomFieldUpdate { name?: string; config?: FieldConfig; }
+/** PUT on an option replaces both, so an update sends both too. */
+export interface NewFieldOption { name: string; color: OptionColor; }
+
+/** Where a custom field lives. Each scope has its own routes, so the variant carries the owner's id. */
+export type FieldScope =
+  | { kind: "global" }
+  | { kind: "project"; projectId: number }
+  | { kind: "board"; boardId: number }
+  | { kind: "funnel"; funnelId: string };
+/** Where a global, project or board field can be sent. */
+export type TransferTarget = Exclude<FieldScope, { kind: "funnel" }>;
+/** The neighbour a thing is placed next to; the API takes exactly one of the two. */
+export type Placement = { after: string } | { before: string };
+
+/** The id of the funnel is an opaque string (`OLY24hy2mC7n9D9l`), not a UUID — verified live 2026-10-14. */
+export interface Funnel { id: string; name: string; customFields: CustomField[]; }
+
+/** The fields every task on a board carries, read off a page of its tasks, with every project those tasks sit in. */
+export interface BoardFieldSample { projectIds: number[]; fields: CustomField[]; }

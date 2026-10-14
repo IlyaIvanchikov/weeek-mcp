@@ -2,10 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { registerWorkspaceTools } from "../../src/tools/workspace.js";
 import { toolHarness, reply } from "../helpers/tool-harness.js";
 
-const clients = { id: 7, name: "Clients", parentId: null, isPrivate: false };
+import type { Portfolio, PortfolioQuery } from "../../src/client.js";
+
+const clients: Portfolio = { id: 7, name: "Clients", parentId: null, isPrivate: false };
 const urgent = { id: 5, title: "Urgent", color: "#f00" };
 const client = () => ({
-  portfolios: { list: vi.fn(async () => ({ portfolios: [clients], hasMore: false })), get: vi.fn(async () => clients) },
+  portfolios: { list: vi.fn(async (_query: PortfolioQuery = {}) => ({ portfolios: [clients], hasMore: false })), get: vi.fn(async () => clients) },
   tags: { list: vi.fn(async () => [urgent]), get: vi.fn(async () => urgent) },
   workspace: { get: vi.fn(async () => ({ id: 3, title: "Acme", description: null, isPersonal: false })) },
   user: { me: vi.fn(async () => ({ id: "u1", name: "Ilya", email: "i@x.y", language: "en", timeZone: null })) },
@@ -32,10 +34,11 @@ describe("workspace tools", () => {
     const created = { id: 8, name: "Internal", parentId: 7, isPrivate: false };
     let known = [clients];
     const create = vi.fn(async () => { known = [clients, created]; return created; });
-    c.portfolios.list.mockImplementation(async ({ search }: { search: string }) => ({ portfolios: known.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())), hasMore: false }));
+    c.portfolios.list.mockImplementation(async ({ search = "" }: PortfolioQuery = {}) => ({ portfolios: known.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())), hasMore: false }));
     const h = toolHarness(registerWorkspaceTools, { ...c, portfolios: { ...c.portfolios, create } });
     const before = await h.call("weeek_get_portfolio", { portfolio: "Internal" }); // caches an empty search result
     expect(before.isError).toBe(true);
+    expect(reply(before).error).toMatch(/could not resolve portfolio "Internal"/);
     await h.call("weeek_create_portfolio", { name: "Internal", parent: "Clients" });
     expect(create).toHaveBeenCalledWith({ name: "Internal", parentId: 7 });
     await h.call("weeek_get_portfolio", { portfolio: "Internal" });

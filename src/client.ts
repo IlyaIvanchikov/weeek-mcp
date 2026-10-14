@@ -8,6 +8,8 @@ import { AttachmentsApi } from "./api/attachments.js";
 import { UserApi } from "./api/user.js";
 import { TagsApi } from "./api/tags.js";
 import { PortfoliosApi } from "./api/portfolios.js";
+import { CustomFieldsApi } from "./api/custom-fields.js";
+import { FunnelsApi } from "./api/crm/funnels.js";
 
 export type * from "./api/types.js";
 
@@ -25,6 +27,9 @@ export class WeeekClient {
   readonly user: UserApi;
   readonly tags: TagsApi;
   readonly portfolios: PortfoliosApi;
+  readonly customFields: CustomFieldsApi;
+  /** CRM clients; Phase 3 carries only what custom fields need. */
+  readonly crm: { funnels: FunnelsApi };
 
   constructor(cfg: HttpConfig, fetchImpl: typeof fetch = fetch) {
     const http = new HttpClient(cfg, fetchImpl);
@@ -37,5 +42,7 @@ export class WeeekClient {
     this.user = new UserApi(http);
     this.tags = new TagsApi(http);
     this.portfolios = new PortfoliosApi(http);
+    this.crm = { funnels: new FunnelsApi(http) };
+    this.customFields = new CustomFieldsApi(http, { projects: this.projects, tasks: this.tasks, funnels: this.crm.funnels });
   }
 }

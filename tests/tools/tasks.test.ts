@@ -22,6 +22,9 @@ const baseClient = {
   workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] },
 };
 
+/** A tasks.list stub whose recorded query is typed, so `list.mock.calls[0][0]` compiles. */
+const listStub = () => vi.fn(async (_query: Record<string, unknown>): Promise<unknown[]> => []);
+
 describe("task tools", () => {
   it("create_task resolves names to ids before creating", async () => {
     const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
@@ -161,21 +164,21 @@ describe("task tools", () => {
   });
 
   it("weeek_list_tasks with no args applies the default perPage/offset", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({});
     expect(list.mock.calls[0][0]).toMatchObject({ perPage: 20, offset: 0 });
   });
 
   it("weeek_list_tasks with a projectId filter still applies the default perPage", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({ projectId: 5 });
     expect(list.mock.calls[0][0]).toMatchObject({ projectId: 5, perPage: 20 });
   });
 
   it("weeek_list_tasks forwards server-side user, status, and date filters", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({
       userId: "a1f0e7c1-f041-4128-a179-5baad1783524",
@@ -355,7 +358,7 @@ describe("task tools", () => {
   });
 
   it("weeek_list_tasks forwards the Phase 2 filters as the API spells them", async () => {
-    const list = vi.fn(async () => []);
+    const list = listStub();
     const h = harness({ tasks: { list } });
     await h.get("weeek_list_tasks")!({ all: true, search: "deploy", priority: "high", type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
     expect(list.mock.calls[0][0]).toMatchObject({ all: 1, search: "deploy", priority: 2, type: "call", boardId: 3, boardColumnId: 30, day: "01.08.2026", completedAtFrom: "01.07.2026", completedAtTo: "31.07.2026" });
@@ -364,7 +367,7 @@ describe("task tools", () => {
   it("weeek_list_tasks rejects a priority outside the four names", async () => {
     const h = harness({ tasks: { list: vi.fn() } });
     // The harness parses synchronously, so wrap the call to observe the zod rejection.
-    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow();
+    await expect(async () => h.get("weeek_list_tasks")!({ priority: "urgent" })).rejects.toThrow(/priority/);
   });
 
   it("create_task sends the priority code, the type and the parent", async () => {
@@ -414,5 +417,67 @@ describe("task tools", () => {
     await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", "backend"] });
     expect(tagList).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledWith(3, { tags: [5, 7] });
+  });
+
+  it("update_task clears the tags when given an empty list", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: [] });
+    expect(update).toHaveBeenCalledWith(3, { tags: [] });
+  });
+
+  it("create_task sends the priority as a code the closed type allows", async () => {
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "x", project: "Marketing", priority: "low" });
+    expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, priority: 0 });
+  });
+
+  it("weeek_list_tasks sends completed and all both as 1 when both are set", async () => {
+    const list = listStub();
+    const h = harness({ tasks: { list } });
+    await h.get("weeek_list_tasks")!({ completed: true, all: true });
+    expect(list.mock.calls[0][0]).toMatchObject({ completed: 1, all: 1 });
+  });
+
+  it("create_task resolves fields against the global and the project lists and sends customFields", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
+    const estimate = { id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Estimate", type: "number", config: null, options: [] };
+    const list = vi.fn(async (scope: { kind: string }) => (scope.kind === "global" ? [estimate] : [stage]));
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, customFields: { list }, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "x", project: "Marketing", fields: { Stage: "review", Estimate: 3 } });
+    expect(list).toHaveBeenCalledWith({ kind: "global" });
+    expect(list).toHaveBeenCalledWith({ kind: "project", projectId: 1 });
+    expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, customFields: { [stage.id]: "o1", [estimate.id]: 3 } });
+  });
+
+  it("update_task reads the task's own fields, then sends customFields", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
+    const getFields = vi.fn(async (_id: number) => [stage]);
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Review" }, title: "New" });
+    expect(getFields).toHaveBeenCalledWith(3);
+    expect(update).toHaveBeenCalledWith(3, { title: "New", customFields: { [stage.id]: "o1" } });
+  });
+
+  it("update_task refuses a misspelt option with candidates and never updates", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }, { id: "o2", name: "Done", color: "green" }] };
+    const getFields = vi.fn(async (_id: number) => [stage]);
+    const update = vi.fn();
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    const res = await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Reviw" } });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text)).toHaveProperty("candidates");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("update_task does not read the task when no fields are given", async () => {
+    const getFields = vi.fn();
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    await h.get("weeek_update_task")!({ id: 3, title: "New" });
+    expect(getFields).not.toHaveBeenCalled();
   });
 });

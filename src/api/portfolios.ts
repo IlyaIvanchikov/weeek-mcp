@@ -1,14 +1,15 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./responses.js";
+import { asRecord, pickArray } from "./responses.js";
 import type { NewPortfolio, Portfolio, PortfolioPage, PortfolioQuery, SuccessResponse } from "./types.js";
 
 export interface UpdatePortfolioOptions { portfolioId: number; name: string; }
 
 const ops = operations.portfolios;
 
-export function toPortfolio(raw: any): Portfolio {
-  return { id: Number(raw.id), name: String(raw.name ?? ""), parentId: raw.parentId == null ? null : Number(raw.parentId), isPrivate: Boolean(raw.isPrivate) };
+export function toPortfolio(raw: unknown): Portfolio {
+  const r = asRecord(raw);
+  return { id: Number(r.id), name: String(r.name ?? ""), parentId: r.parentId == null ? null : Number(r.parentId), isPrivate: Boolean(r.isPrivate) };
 }
 
 export class PortfoliosApi {
@@ -25,9 +26,7 @@ export class PortfoliosApi {
   }
 
   async create(newPortfolio: NewPortfolio): Promise<Portfolio> {
-    const body: Record<string, unknown> = { name: newPortfolio.name };
-    if (newPortfolio.parentId !== undefined) body.parentId = newPortfolio.parentId;
-    const json = await this.http.execute<{ data: unknown }>(ops.create, { body });
+    const json = await this.http.execute<{ data: unknown }>(ops.create, { body: newPortfolio });
     return toPortfolio(json.data);
   }
 

@@ -1,9 +1,9 @@
 {
   "manifest_version": "0.3",
   "name": "weeek-mcp-smart",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "WEEEK tasks by name, not IDs — an MCP server",
-  "long_description": "The only one-click WEEEK MCP server. Create, update, move, and complete WEEEK tasks by passing plain names — project, column, and assignee — instead of hunting down IDs first. Natural-language due dates (\"next friday\"), a guarded file-attach tool, and a confirm-gated delete. Tools come in three toolsets: tasks by default, plus time and projects, enabled through WEEEK_TOOLSETS.",
+  "long_description": "The only one-click WEEEK MCP server. Create, update, move, and complete WEEEK tasks by passing plain names — project, column, and assignee — instead of hunting down IDs first. Natural-language due dates (\"next friday\"), a guarded file-attach tool, and a confirm-gated delete. Tools come in four toolsets: tasks by default (including reading and setting custom-field values by name), plus time, projects and custom-fields (which administers the fields and their options), enabled through WEEEK_TOOLSETS.",
   "author": {
     "name": "Ilya Ivanchikov",
     "email": "ilyaivanchikov96@mail.ru",
@@ -41,7 +41,7 @@
     "weeek_toolsets": {
       "type": "string",
       "title": "Toolsets",
-      "description": "Comma-separated tool groups to expose: tasks (default), time, projects — or all",
+      "description": "Comma-separated tool groups to expose: tasks (default), time, projects, custom-fields — or all",
       "required": false,
       "default": "tasks"
     }

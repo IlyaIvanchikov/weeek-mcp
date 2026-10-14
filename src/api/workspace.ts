@@ -1,6 +1,6 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray, toMember } from "./responses.js";
+import { pickArray, toMember, toWorkspace } from "./responses.js";
 import type { Member, Workspace } from "./types.js";
 
 export class WorkspaceApi {
@@ -11,8 +11,7 @@ export class WorkspaceApi {
   }
 
   async get(): Promise<Workspace> {
-    const json = await this.http.execute<{ workspace: any }>(operations.workspace.get);
-    const raw = json.workspace ?? {};
-    return { id: Number(raw.id), title: String(raw.title ?? ""), description: raw.description == null ? null : String(raw.description), isPersonal: Boolean(raw.isPersonal) };
+    const json = await this.http.execute<{ workspace: unknown }>(operations.workspace.get);
+    return toWorkspace(json.workspace);
   }
 }

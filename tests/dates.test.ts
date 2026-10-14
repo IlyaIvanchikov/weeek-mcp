@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDay } from "../src/dates.js";
+import { parseDay, parseDateTime } from "../src/dates.js";
 
 const now = new Date("2026-07-14T12:00:00Z"); // Tuesday
 
@@ -12,5 +12,15 @@ describe("parseDay", () => {
   });
   it("throws on nonsense", () => {
     expect(() => parseDay("banana", now)).toThrow(/could not parse date/);
+  });
+});
+
+describe("parseDateTime", () => {
+  it("keeps an ISO instant and anchors a relative time on now", () => {
+    expect(Date.parse(parseDateTime("2026-08-01T10:00:00Z", now))).toBe(Date.parse("2026-08-01T10:00:00Z"));
+    expect(parseDateTime("in 2 hours", now)).toBe(new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString());
+  });
+  it("throws on nonsense", () => {
+    expect(() => parseDateTime("banana", now)).toThrow(/could not parse date/);
   });
 });

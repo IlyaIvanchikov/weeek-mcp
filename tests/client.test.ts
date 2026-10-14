@@ -5,7 +5,7 @@ import { AttachmentsApi } from "../src/api/attachments.js";
 import { UserApi } from "../src/api/user.js";
 import { TagsApi } from "../src/api/tags.js";
 import { PortfoliosApi } from "../src/api/portfolios.js";
-import { httpConfig } from "./helpers/http.js";
+import { httpConfig, jsonFetch, sent } from "./helpers/http.js";
 
 describe("WeeekClient facade", () => {
   it("exposes one resource client per API area", () => {
@@ -20,12 +20,14 @@ describe("WeeekClient facade", () => {
     expect(typeof c.boards.list).toBe("function");
     expect(typeof c.columns.list).toBe("function");
     expect(typeof c.workspace.listMembers).toBe("function");
+    expect(typeof c.customFields.list).toBe("function");
+    expect(typeof c.crm.funnels.list).toBe("function");
   });
 
   it("routes every resource client through the same injected fetch", async () => {
-    const f = vi.fn(async () => new Response(JSON.stringify({ success: true, projects: [] }), { status: 200, headers: { "content-type": "application/json" } }));
+    const f = jsonFetch(200, { success: true, projects: [] });
     const c = new WeeekClient(httpConfig, f as unknown as typeof fetch);
     await c.projects.list();
-    expect(String(f.mock.calls[0][0])).toBe("https://api.weeek.net/public/v1/tm/projects");
+    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/projects");
   });
 });

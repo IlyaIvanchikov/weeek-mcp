@@ -89,6 +89,59 @@ export const operations = {
   attachments: {
     get: { method: "GET", path: "/ws/attachments/{fileId}" },
   },
+  // Custom fields: the same CRUD per scope. The four groups share member names so one
+  // client method can pick a group by scope and call the same member (src/api/custom-fields.ts).
+  globalFields: {
+    list: { method: "GET", path: "/tm/custom-fields" },
+    create: { method: "POST", path: "/tm/custom-fields" },
+    update: { method: "PUT", path: "/tm/custom-fields/{fieldId}" },
+    remove: { method: "DELETE", path: "/tm/custom-fields/{fieldId}" },
+    transferToProject: { method: "POST", path: "/tm/custom-fields/{fieldId}/transfer-to-project" },
+    transferToBoard: { method: "POST", path: "/tm/custom-fields/{fieldId}/transfer-to-board" },
+    createOption: { method: "POST", path: "/tm/custom-fields/{fieldId}/options" },
+    updateOption: { method: "PUT", path: "/tm/custom-fields/{fieldId}/options/{optionId}" },
+    removeOption: { method: "DELETE", path: "/tm/custom-fields/{fieldId}/options/{optionId}" },
+    moveOption: { method: "POST", path: "/tm/custom-fields/{fieldId}/options/{optionId}/move" },
+  },
+  projectFields: {
+    create: { method: "POST", path: "/tm/projects/{projectId}/custom-fields" },
+    update: { method: "PUT", path: "/tm/projects/{projectId}/custom-fields/{fieldId}" },
+    remove: { method: "DELETE", path: "/tm/projects/{projectId}/custom-fields/{fieldId}" },
+    // The API calls the global scope "task manager".
+    transferToGlobal: { method: "POST", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/transfer-to-task-manager" },
+    transferToProject: { method: "POST", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/transfer-to-project" },
+    transferToBoard: { method: "POST", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/transfer-to-board" },
+    createOption: { method: "POST", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/options" },
+    updateOption: { method: "PUT", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/options/{optionId}" },
+    removeOption: { method: "DELETE", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/options/{optionId}" },
+    moveOption: { method: "POST", path: "/tm/projects/{projectId}/custom-fields/{fieldId}/options/{optionId}/move" },
+  },
+  boardFields: {
+    create: { method: "POST", path: "/tm/boards/{boardId}/custom-fields" },
+    update: { method: "PUT", path: "/tm/boards/{boardId}/custom-fields/{fieldId}" },
+    remove: { method: "DELETE", path: "/tm/boards/{boardId}/custom-fields/{fieldId}" },
+    transferToGlobal: { method: "POST", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/transfer-to-task-manager" },
+    transferToProject: { method: "POST", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/transfer-to-project" },
+    transferToBoard: { method: "POST", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/transfer-to-board" },
+    createOption: { method: "POST", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/options" },
+    updateOption: { method: "PUT", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/options/{optionId}" },
+    removeOption: { method: "DELETE", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/options/{optionId}" },
+    moveOption: { method: "POST", path: "/tm/boards/{boardId}/custom-fields/{fieldId}/options/{optionId}/move" },
+  },
+  funnelFields: {
+    create: { method: "POST", path: "/crm/funnels/{funnelId}/custom-fields" },
+    update: { method: "PUT", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}" },
+    remove: { method: "DELETE", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}" },
+    move: { method: "POST", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}/move" },
+    createOption: { method: "POST", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}/options" },
+    updateOption: { method: "PUT", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}/options/{optionId}" },
+    removeOption: { method: "DELETE", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}/options/{optionId}" },
+    moveOption: { method: "POST", path: "/crm/funnels/{funnelId}/custom-fields/{fieldId}/options/{optionId}/move" },
+  },
+  // Pulled forward from Phase 4: funnel names must resolve for the funnel scope above.
+  funnels: {
+    list: { method: "GET", path: "/crm/funnels" },
+  },
 } as const satisfies Record<string, Record<string, Operation>>;
 
 export function listOperations(): Operation[] {

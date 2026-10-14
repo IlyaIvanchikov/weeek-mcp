@@ -18,5 +18,11 @@ export const projectToolNames = [
   "weeek_list_tags", "weeek_get_tag", "weeek_create_tag", "weeek_update_tag", "weeek_delete_tag",
   "weeek_get_workspace", "weeek_get_profile",
 ].sort();
+export const customFieldToolNames = [
+  "weeek_list_custom_fields", "weeek_create_custom_field", "weeek_update_custom_field", "weeek_delete_custom_field",
+  "weeek_transfer_custom_field", "weeek_move_custom_field",
+  "weeek_add_field_option", "weeek_update_field_option", "weeek_delete_field_option", "weeek_move_field_option",
+].sort();
+
 /** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
-export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames].sort();
+export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames, ...customFieldToolNames].sort();
