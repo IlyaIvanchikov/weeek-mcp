@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickArray, toMember, toProfile } from "../../src/api/responses.js";
+import { asRecord, isOneOf, pickArray, toMember, toProfile, toWorkspace } from "../../src/api/responses.js";
 
 describe("pickArray", () => {
   it("returns the array under the expected key", () => {
@@ -27,5 +27,30 @@ describe("toMember", () => {
 describe("toProfile", () => {
   it("keeps the member name rule and adds the profile fields, nulling the absent ones", () => {
     expect(toProfile({ id: "u1", email: "i@x.y", firstName: "Ilya" })).toEqual({ id: "u1", name: "Ilya", email: "i@x.y", language: null, timeZone: null });
+  });
+});
+
+describe("asRecord", () => {
+  it("returns the object itself, and {} for anything that is not one", () => {
+    const record = { id: 1 };
+    expect(asRecord(record)).toBe(record);
+    expect(asRecord(null)).toEqual({});
+    expect(asRecord("x")).toEqual({});
+    expect(asRecord(undefined)).toEqual({});
+  });
+});
+
+describe("isOneOf", () => {
+  it("narrows a value to a member of a closed list, for strings and numbers", () => {
+    expect(isOneOf(["a", "b"] as const, "a")).toBe(true);
+    expect(isOneOf(["a", "b"] as const, "c")).toBe(false);
+    expect(isOneOf([1, 2] as const, 2)).toBe(true);
+    expect(isOneOf([1, 2] as const, "2")).toBe(false);
+  });
+});
+
+describe("toWorkspace", () => {
+  it("normalises the workspace and nulls a missing description", () => {
+    expect(toWorkspace({ id: "3", title: "Acme", isPersonal: 1 })).toEqual({ id: 3, title: "Acme", description: null, isPersonal: true });
   });
 });

@@ -1,14 +1,15 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./responses.js";
+import { asRecord, pickArray } from "./responses.js";
 import type { NewTag, SuccessResponse, Tag, TagUpdate } from "./types.js";
 
 export interface UpdateTagOptions { tagId: number; update: TagUpdate; }
 
 const ops = operations.tags;
 
-export function toTag(raw: any): Tag {
-  return { id: Number(raw.id), title: String(raw.title ?? ""), color: String(raw.color ?? "") };
+export function toTag(raw: unknown): Tag {
+  const r = asRecord(raw);
+  return { id: Number(r.id), title: String(r.title ?? ""), color: String(r.color ?? "") };
 }
 
 export class TagsApi {

@@ -1,10 +1,10 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
 import { apiFlag } from "./requests.js";
-import { pickArray } from "./responses.js";
+import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
-import type { Attachment, CommentsPage, NewTask, SuccessResponse, TaskComment, TaskLocation, TaskType, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
+import type { Attachment, CommentsPage, NewTask, SuccessResponse, TaskComment, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -25,8 +25,9 @@ const ops = operations.tasks;
 const optionalNumber = (value: unknown): number | null => (value == null ? null : Number(value));
 const optionalString = (value: unknown): string | null => (value == null ? null : String(value));
 
-function toLocation(raw: any): TaskLocation {
-  return { projectId: Number(raw.projectId), boardId: optionalNumber(raw.boardId), boardColumnId: optionalNumber(raw.boardColumnId) };
+function toLocation(raw: unknown): TaskLocation {
+  const r = asRecord(raw);
+  return { projectId: Number(r.projectId), boardId: optionalNumber(r.boardId), boardColumnId: optionalNumber(r.boardColumnId) };
 }
 
 /** The spec wants isOvertime as 0 or 1 on the wire, not a boolean. */
@@ -34,48 +35,51 @@ function timeEntryBody(entry: TimeEntryFields) {
   return { ...entry, isOvertime: apiFlag(entry.isOvertime) };
 }
 
-export function toTimeEntry(raw: any): TimeEntry {
+export function toTimeEntry(raw: unknown): TimeEntry {
+  const r = asRecord(raw);
   return {
-    id: String(raw.id ?? ""), userId: String(raw.userId ?? ""), date: String(raw.date ?? ""),
-    duration: Number(raw.duration ?? 0), isOvertime: Boolean(raw.isOvertime), comment: raw.comment == null ? "" : String(raw.comment),
+    id: String(r.id ?? ""), userId: String(r.userId ?? ""), date: String(r.date ?? ""),
+    duration: Number(r.duration ?? 0), isOvertime: Boolean(r.isOvertime), comment: r.comment == null ? "" : String(r.comment),
   };
 }
 
-function toComment(raw: any): TaskComment {
+function toComment(raw: unknown): TaskComment {
+  const r = asRecord(raw);
   return {
-    id: Number(raw.id), parentId: optionalNumber(raw.parentId), authorId: String(raw.authorId ?? ""),
-    markdown: String(raw.markdown ?? ""), createdAt: String(raw.createdAt ?? ""), updatedAt: String(raw.updatedAt ?? ""),
+    id: Number(r.id), parentId: optionalNumber(r.parentId), authorId: String(r.authorId ?? ""),
+    markdown: String(r.markdown ?? ""), createdAt: String(r.createdAt ?? ""), updatedAt: String(r.updatedAt ?? ""),
   };
 }
 
-function toTask(raw: any): WeeekTask {
+function toTask(raw: unknown): WeeekTask {
+  const r = asRecord(raw);
   return {
-    id: Number(raw.id),
-    title: String(raw.title ?? ""),
-    description: raw.description ?? null,
-    projectId: optionalNumber(raw.projectId),
-    boardId: optionalNumber(raw.boardId),
-    boardColumnId: optionalNumber(raw.boardColumnId),
-    parentId: optionalNumber(raw.parentId),
-    subTasks: Array.isArray(raw.subTasks) ? raw.subTasks.map(Number) : [],
-    assignees: Array.isArray(raw.assignees) ? raw.assignees.map(String) : [],
+    id: Number(r.id),
+    title: String(r.title ?? ""),
+    description: r.description == null ? null : String(r.description),
+    projectId: optionalNumber(r.projectId),
+    boardId: optionalNumber(r.boardId),
+    boardColumnId: optionalNumber(r.boardColumnId),
+    parentId: optionalNumber(r.parentId),
+    subTasks: Array.isArray(r.subTasks) ? r.subTasks.map(Number) : [],
+    assignees: Array.isArray(r.assignees) ? r.assignees.map(String) : [],
     // The API calls watchers "subscribers" on the task and "watchers" on the endpoint that sets them.
-    watchers: Array.isArray(raw.subscribers) ? raw.subscribers.map(String) : [],
-    authorId: optionalString(raw.authorId),
-    priority: priorityName(raw.priority),
-    type: (taskTypes as readonly string[]).includes(raw.type) ? (raw.type as TaskType) : null,
-    startDate: optionalString(raw.startDate),
-    dueDate: optionalString(raw.dueDate),
-    completed: Boolean(raw.isCompleted ?? raw.completed ?? false),
-    completedAt: optionalString(raw.completedAt),
-    createdAt: optionalString(raw.createdAt),
-    duration: optionalNumber(raw.duration),
-    tags: Array.isArray(raw.tags) ? raw.tags.map(Number) : [],
-    locations: Array.isArray(raw.locations) ? raw.locations.map(toLocation) : [],
-    timeEntries: Array.isArray(raw.timeEntries) ? raw.timeEntries.map(toTimeEntry) : [],
+    watchers: Array.isArray(r.subscribers) ? r.subscribers.map(String) : [],
+    authorId: optionalString(r.authorId),
+    priority: priorityName(r.priority),
+    type: isOneOf(taskTypes, r.type) ? r.type : null,
+    startDate: optionalString(r.startDate),
+    dueDate: optionalString(r.dueDate),
+    completed: Boolean(r.isCompleted ?? r.completed ?? false),
+    completedAt: optionalString(r.completedAt),
+    createdAt: optionalString(r.createdAt),
+    duration: optionalNumber(r.duration),
+    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    locations: Array.isArray(r.locations) ? r.locations.map(toLocation) : [],
+    timeEntries: Array.isArray(r.timeEntries) ? r.timeEntries.map(toTimeEntry) : [],
     // The API returns these with every task; surfacing them is what lets a caller see a
     // screenshot-only description instead of silently working from the prose.
-    attachments: Array.isArray(raw.attachments) ? (raw.attachments as Attachment[]) : [],
+    attachments: Array.isArray(r.attachments) ? (r.attachments as Attachment[]) : [],
   };
 }
 
@@ -151,8 +155,10 @@ export class TasksApi {
     return toComment(json.comment);
   }
 
-  async removeComment({ taskId, commentId }: CommentRef): Promise<void> {
+  async removeComment({ taskId, commentId }: CommentRef): Promise<SuccessResponse> {
+    // The API answers 204 with no body; the envelope every other delete returns is built here, once.
     await this.http.execute(ops.removeComment, { params: { taskId, commentId } });
+    return { success: true };
   }
 
   async addAssignees({ taskId, memberIds }: TaskMembersOptions): Promise<WeeekTask> {

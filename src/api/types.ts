@@ -26,6 +26,8 @@ export interface DownloadAttachmentOptions { attachment: Attachment; maxBytes: n
 
 export type TaskPriority = (typeof taskPriorities)[number];
 export type TaskType = (typeof taskTypes)[number];
+/** A wire priority is an index into taskPriorities (0 low … 3 hold); derived from the tuple so the two cannot drift. */
+export type TaskPriorityCode = Exclude<Partial<typeof taskPriorities>["length"], (typeof taskPriorities)["length"]>;
 
 export interface TaskLocation { projectId: number; boardId: number | null; boardColumnId: number | null; }
 
@@ -73,7 +75,7 @@ export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
   description?: string; userId?: string; dayFrom?: string;
   /** Wire code; use priorityCode() to build it from a name. */
-  priority?: number;
+  priority?: TaskPriorityCode;
   type?: TaskType;
   parentId?: number;
 }

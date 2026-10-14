@@ -418,4 +418,18 @@ describe("task tools", () => {
     expect(tagList).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledWith(3, { tags: [5, 7] });
   });
+
+  it("update_task clears the tags when given an empty list", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { update } });
+    await h.get("weeek_update_task")!({ id: 3, tags: [] });
+    expect(update).toHaveBeenCalledWith(3, { tags: [] });
+  });
+
+  it("create_task sends the priority as a code the closed type allows", async () => {
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "x", project: "Marketing", priority: "low" });
+    expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, priority: 0 });
+  });
 });

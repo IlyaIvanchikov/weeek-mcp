@@ -19,8 +19,5 @@ export function registerCommentTools({ server, client }: ToolContext): void {
     description: "Permanently delete one comment from a WEEEK task. Irreversible; requires confirm:true.",
     inputSchema: { id: taskId, comment_id: z.number().int(), confirm: confirmation },
     annotations: destructiveAnnotations,
-  }, async (args) => {
-    await client.tasks.removeComment({ taskId: args.id, commentId: args.comment_id });
-    return { success: true };
-  });
+  }, async (args) => client.tasks.removeComment({ taskId: args.id, commentId: args.comment_id }));
 }

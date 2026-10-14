@@ -25,12 +25,30 @@ export const MAX_AUTO_PAGES = 20;
 // deliberately does not demand a uuid it never promised.
 const ATTACHMENT_ID = /^[A-Za-z0-9_-]+$/;
 
-interface CreateInput {
-  title: string; project: string | number;
-  column?: string | number; assignee?: string | number;
-  due?: string; description?: string;
-  priority?: TaskPriority; type?: TaskType; parent?: number;
-}
+const createShape = {
+  title: z.string(),
+  project: nameOrId,
+  column: nameOrId.optional(),
+  assignee: nameOrId.optional(),
+  due: z.string().optional(),
+  description: z.string().optional(),
+  priority: z.enum(taskPriorities).optional(),
+  type: z.enum(taskTypes).optional(),
+  parent: z.number().int().optional().describe("Id of the task this one becomes a subtask of."),
+};
+type CreateInput = z.infer<z.ZodObject<typeof createShape>>;
+
+const updateShape = {
+  id: taskId,
+  title: z.string().optional(),
+  due: z.string().optional(),
+  start: z.string().optional(),
+  priority: z.enum(taskPriorities).optional(),
+  type: z.enum(taskTypes).optional(),
+  duration: z.number().int().min(0).optional(),
+  tags: z.array(nameOrId).max(50).optional().describe("Replaces the task's tags; an empty list clears them."),
+};
+type UpdateInput = z.infer<z.ZodObject<typeof updateShape>>;
 
 export async function buildNewTask(resolver: Resolver, input: CreateInput): Promise<NewTask> {
   const projectId = await resolver.resolve({ kind: "project", value: input.project });
@@ -43,12 +61,6 @@ export async function buildNewTask(resolver: Resolver, input: CreateInput): Prom
   if (input.type !== undefined) newTask.type = input.type;
   if (input.parent !== undefined) newTask.parentId = input.parent;
   return newTask;
-}
-
-interface UpdateInput {
-  title?: string; due?: string; start?: string;
-  priority?: TaskPriority; type?: TaskType; duration?: number;
-  tags?: Array<string | number>;
 }
 
 /** The PUT body for weeek_update_task: only the fields given, names resolved to ids. */
@@ -66,17 +78,6 @@ export async function buildTaskPatch(resolver: Resolver, input: UpdateInput): Pr
   return patch;
 }
 
-const createShape = {
-  title: z.string(),
-  project: nameOrId,
-  column: nameOrId.optional(),
-  assignee: nameOrId.optional(),
-  due: z.string().optional(),
-  description: z.string().optional(),
-  priority: z.enum(taskPriorities).optional(),
-  type: z.enum(taskTypes).optional(),
-  parent: z.number().int().optional().describe("Id of the task this one becomes a subtask of."),
-};
 
 const listShape = {
   projectId: z.number().int().optional(),
@@ -239,17 +240,8 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_update_task", {
     description:
-      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, and `tags` by name or id (replaces the task's tags; needs at least one name or id). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
-    inputSchema: {
-      id: taskId,
-      title: z.string().optional(),
-      due: z.string().optional(),
-      start: z.string().optional(),
-      priority: z.enum(taskPriorities).optional(),
-      type: z.enum(taskTypes).optional(),
-      duration: z.number().int().min(0).optional(),
-      tags: nameOrIdList.optional(),
-    },
+      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, and `tags` by name or id (replaces the task's tags; an empty list clears them). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
+    inputSchema: updateShape,
   }, async (args) => client.tasks.update(args.id, await buildTaskPatch(resolver, args)));
 
   registerJsonTool(server, "weeek_delete_task", {

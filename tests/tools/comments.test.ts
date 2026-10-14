@@ -22,7 +22,7 @@ describe("comment tools", () => {
   });
 
   it("weeek_delete_comment needs confirm:true and then deletes", async () => {
-    const removeComment = vi.fn(async () => undefined);
+    const removeComment = vi.fn(async () => ({ success: true }));
     const h = toolHarness(registerCommentTools, { tasks: { removeComment } });
     expect(() => h.call("weeek_delete_comment", { id: 78, comment_id: 9 })).toThrow(/confirm/);
     expect(removeComment).not.toHaveBeenCalled();

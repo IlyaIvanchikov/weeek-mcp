@@ -1,13 +1,9 @@
 import { z } from "zod";
 import type { ToolContext } from "../toolsets/types.js";
-import type { Resolver } from "../resolver.js";
 import { destructiveAnnotations } from "./constants.js";
 import { confirmation, nameOrId, nameOrIdList, taskId } from "./inputs.js";
 import { registerJsonTool } from "./json-tool.js";
-
-async function resolveMembers(resolver: Resolver, values: Array<string | number>): Promise<string[]> {
-  return Promise.all(values.map((value) => resolver.resolve({ kind: "member", value })));
-}
+import { resolveMembers } from "./members.js";
 
 /** Tools that attach a task to people and places: assignees, watchers, projects, a parent task. */
 export function registerTaskLinkTools({ server, client, resolver }: ToolContext): void {

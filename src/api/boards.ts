@@ -1,6 +1,6 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./responses.js";
+import { asRecord, pickArray } from "./responses.js";
 import type { Board, NewBoard, SuccessResponse } from "./types.js";
 
 export interface UpdateBoardOptions { boardId: number; name: string; }
@@ -9,8 +9,9 @@ export interface MoveBoardOptions { boardId: number; upperBoardId: number | null
 
 const ops = operations.boards;
 
-export function toBoard(raw: any): Board {
-  return { id: Number(raw.id), name: String(raw.name ?? ""), projectId: Number(raw.projectId), isPrivate: Boolean(raw.isPrivate) };
+export function toBoard(raw: unknown): Board {
+  const r = asRecord(raw);
+  return { id: Number(r.id), name: String(r.name ?? ""), projectId: Number(r.projectId), isPrivate: Boolean(r.isPrivate) };
 }
 
 export class BoardsApi {

@@ -1,8 +1,9 @@
 import { taskPriorities } from "./constants.js";
-import type { TaskPriority } from "./types.js";
+import type { TaskPriority, TaskPriorityCode } from "./types.js";
 
-export function priorityCode(name: TaskPriority): number {
-  return taskPriorities.indexOf(name);
+export function priorityCode(name: TaskPriority): TaskPriorityCode {
+  // indexOf is typed number; a TaskPriority is always in the tuple, so the index is one of its positions.
+  return taskPriorities.indexOf(name) as TaskPriorityCode;
 }
 
 /** The name for a wire code, or null for anything that is not one — the API sends null for "unset". */

@@ -1,6 +1,6 @@
 import type { HttpClient } from "../http.js";
 import { operations } from "../operations.js";
-import { pickArray } from "./responses.js";
+import { asRecord, pickArray } from "./responses.js";
 import type { BoardColumn, NewColumn, SuccessResponse } from "./types.js";
 
 export interface UpdateColumnOptions { columnId: number; name: string; }
@@ -9,8 +9,9 @@ export interface MoveColumnOptions { columnId: number; upperColumnId: number | n
 
 const ops = operations.columns;
 
-export function toColumn(raw: any): BoardColumn {
-  return { id: Number(raw.id), name: String(raw.name ?? ""), boardId: Number(raw.boardId) };
+export function toColumn(raw: unknown): BoardColumn {
+  const r = asRecord(raw);
+  return { id: Number(r.id), name: String(r.name ?? ""), boardId: Number(r.boardId) };
 }
 
 export class ColumnsApi {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { TasksApi } from "../../src/api/tasks.js";
-import { jsonFetch, httpWith, sent } from "../helpers/http.js";
+import { jsonFetch, httpWith, sent, type FetchStub } from "../helpers/http.js";
 
 const rawTask = {
   id: 78, title: "T", description: null, projectId: 2, boardId: 3, boardColumnId: 8,
@@ -132,9 +132,9 @@ describe("TasksApi", () => {
     expect(sent(g).json()).toEqual({ markdown: "top" });
   });
 
-  it("removeComment DELETEs and accepts an empty 204 body", async () => {
-    const f = vi.fn(async () => new Response(null, { status: 204 }));
-    await expect(new TasksApi(httpWith(f)).removeComment({ taskId: 78, commentId: 9 })).resolves.toBeUndefined();
+  it("removeComment DELETEs, accepts an empty 204 body and answers with the success envelope", async () => {
+    const f = vi.fn<FetchStub>(async () => new Response(null, { status: 204 }));
+    expect(await new TasksApi(httpWith(f)).removeComment({ taskId: 78, commentId: 9 })).toEqual({ success: true });
     expect(sent(f).init.method).toBe("DELETE");
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78/comments/9");
   });
