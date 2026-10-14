@@ -29,7 +29,7 @@ describe("WEEEK_TOOLSETS", () => {
     expect(parseToolsets(" tasks , ALL,,tasks")).toEqual(["tasks", "all"]);
   });
   it("rejects an unknown toolset and names the valid ones", () => {
-    expect(() => loadConfig({ WEEEK_TOOLSETS: "tasks,crm" })).toThrow(/WEEEK_TOOLSETS.*"crm".*tasks, all/);
+    expect(() => loadConfig({ WEEEK_TOOLSETS: "tasks,crm" })).toThrow(new RegExp(`WEEEK_TOOLSETS.*"crm".*${toolsetNames.join(", ")}`));
   });
   it("keeps the parsed names typed without a cast", () => {
     const names = parseToolsets("tasks");

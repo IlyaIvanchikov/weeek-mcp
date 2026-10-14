@@ -9,3 +9,6 @@ export const defaultToolNames = [
   "weeek_add_assignees", "weeek_remove_assignees", "weeek_add_watchers", "weeek_remove_watchers",
   "weeek_add_task_to_project", "weeek_remove_task_from_project", "weeek_set_task_parent",
 ].sort();
+export const timeToolNames = ["weeek_set_timer", "weeek_add_time_entry", "weeek_update_time_entry", "weeek_delete_time_entry"].sort();
+/** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
+export const allToolNames = [...defaultToolNames, ...timeToolNames].sort();
