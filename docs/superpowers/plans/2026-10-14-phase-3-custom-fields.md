@@ -2830,13 +2830,13 @@ CI (`release.yml`) verifies the tag equals `package.json`'s version, runs the te
 
 - [ ] **Step 8: Live smoke (user-run, token stays in the server)**
 
-With the published 0.7.0 configured as the `weeek` MCP server and `WEEEK_TOOLSETS=all` (restart the client after changing it). Record every unexpected outcome in FOLLOWUPS #23. The Phase 2 smoke (FOLLOWUPS #21) is still open and can run on the same build.
+Run it on the **local build** (`node dist/index.js` configured as the `weeek` server, `WEEEK_TOOLSETS=all`; restart the client after changing it) *before* Step 7's tag — the tag follows a clean smoke. Record every unexpected outcome in FOLLOWUPS #23. The Phase 2 smoke (FOLLOWUPS #21) is still open and can run on the same build.
 
 1. 🔵 `weeek_version` → `0.7.0`; the client lists 64 tools.
 2. 🟢 `weeek_create_project { name: "phase-3 smoke" }`; `weeek_create_task { title: "smoke", project: "phase-3 smoke" }` → task T.
 3. 🟢 `weeek_create_custom_field { scope: "global", name: "Estimate", type: "number", precision: 1 }`; `weeek_list_custom_fields { scope: "global" }` shows it with `config`.
 4. 🟢 `weeek_create_custom_field { scope: "project", project: "phase-3 smoke", name: "Stage", type: "select" }`; `weeek_add_field_option { scope: "project", project: "phase-3 smoke", field: "Stage", name: "Review", color: "blue" }`, then `{ name: "Done", color: "green" }`; `weeek_update_field_option { …, option: "Done", color: "yellow" }` → note whether `yellow` is accepted (#23 d); `weeek_move_field_option { …, option: "Done", before: "Review" }` (#23 e).
-5. 🟢 `weeek_update_task { id: T, fields: { "Estimate": 2.5, "Stage": "Review" } }` → `weeek_get_task { id: T }` shows `customFields` with `Stage: "Review"` and `Estimate: 2.5` (#23 c, h). Then `fields: { "Estimate": null }` → `Estimate` is `null` on re-read (#23 f).
+5. 🟢 `weeek_update_task { id: T, fields: { "Estimate": 2.5, "Stage": "Review" } }` → `weeek_get_task { id: T }` shows `customFields` with `Stage: "Review"` and `Estimate: 2.5` (#23 c, h). Then `fields: { "Estimate": null }` → `Estimate` is `null` on re-read and `Stage` is still "Review" (#23 k) (#23 f).
 6. 🟢 `weeek_create_task { title: "smoke 2", project: "phase-3 smoke", fields: { "Stage": "Done" } }` → the created task shows `Stage: "Done"`.
 7. 🔵 `weeek_create_board { project: "phase-3 smoke", name: "B" }`; `weeek_create_custom_field { scope: "board", board: "B", project: "phase-3 smoke", name: "Lane", type: "text" }`; `weeek_list_custom_fields { scope: "board", board: "B", project: "phase-3 smoke" }` → empty while the board has no task; `weeek_move_task { id: T, board_id: <B>, column: "<a column of B>" }` (list columns first); list again → shows `Lane` only (#23 a). `weeek_get_project { project: "phase-3 smoke" }` → `customFields` holds `Stage` only (#23 a, i).
 8. 🟢 `weeek_create_custom_field { scope: "global", name: "When", type: "datetime" }`; `weeek_update_task { id: T, fields: { "When": "tomorrow 10:00" } }` → re-read shows the stored instant (#23 g).

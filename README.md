@@ -78,7 +78,8 @@ an unknown name is rejected at startup with the list of valid ones.
 
 Custom-field **values** need no extra toolset: `weeek_get_task` returns them, and
 `weeek_create_task` / `weeek_update_task` take `fields: { "Estimate": 5, "Stage": "Review" }` by
-field name. The `custom-fields` toolset is for administering the fields themselves — in the
+field name (on create, global and project fields; a board's own fields once the task exists, via
+`weeek_update_task`). The `custom-fields` toolset is for administering the fields themselves — in the
 global scope, a project, a board or a CRM funnel. A board's fields are read off its tasks because
 the API lists them nowhere else, so an empty board shows none.
 
