@@ -75,6 +75,8 @@ tool schemas per request; `all` is 29 104 bytes. `custom-fields` (0.7.0) and `cr
 (1.0.0) arrive in the next releases; an unknown name is rejected at startup with the list of
 valid ones.
 
+Upgrading from 0.5.0: the default toolset grew from 12 tools to 24 in 0.6.0 (plus `weeek_version`), and `WEEEK_TOOLSETS=tasks` is still the default, so nothing else changes unless you opt in to `time`, `projects` or `all`.
+
 ```bash
 WEEEK_TOOLSETS=tasks,time npx -y weeek-mcp-smart   # add time tracking
 WEEEK_TOOLSETS=all npx -y weeek-mcp-smart          # everything
