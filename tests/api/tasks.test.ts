@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { TasksApi } from "../../src/api/tasks.js";
+import { TasksApi, boardFieldSamplePageSize } from "../../src/api/tasks.js";
 import { jsonFetch, httpWith, sent, type FetchStub } from "../helpers/http.js";
 
 const rawTask = {
@@ -239,16 +239,35 @@ describe("TasksApi", () => {
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
   });
 
-  it("sampleBoardFields reads one task of the board, with every task state, and the project it sits in there", async () => {
-    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "text", options: [], value: "x" };
-    const f = jsonFetch(200, { success: true, tasks: [{ ...rawTask, locations: [{ projectId: 9, boardId: 1 }, { projectId: 2, boardId: 3 }], customFields: [rawField] }] });
-    expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({ projectId: 2, fields: [{ id: rawField.id, name: "Stage", type: "text", config: null, options: [] }] });
-    expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks?boardId=3&perPage=1&all=1");
-  });
+  describe("sampleBoardFields", () => {
+    const rawFieldNamed = (name: string, n: number) => ({ id: `0b1e4d7c-${n}${n}${n}${n}-4aaa-8bbb-00000000000${n}`, name, type: "text", options: [], value: "x" });
+    const globalField = rawFieldNamed("G", 1);
+    const project2Field = rawFieldNamed("P2", 2);
+    const board3Field = rawFieldNamed("B3", 3);
+    const project9Field = rawFieldNamed("X9", 4);
+    const normalised = (raw: typeof globalField) => ({ id: raw.id, name: raw.name, type: "text", config: null, options: [] });
 
-  it("sampleBoardFields is null for a board without tasks", async () => {
-    const f = jsonFetch(200, { success: true, tasks: [] });
-    expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toBeNull();
+    it("keeps the fields every task of the page carries and collects every project they sit in", async () => {
+      const taskA = { ...rawTask, locations: [{ projectId: 2, boardId: 3 }, { projectId: 9, boardId: 1 }], customFields: [globalField, project2Field, board3Field, project9Field] };
+      const taskB = { ...rawTask, locations: [{ projectId: 2, boardId: 3 }], customFields: [globalField, project2Field, board3Field] };
+      const f = jsonFetch(200, { success: true, tasks: [taskA, taskB] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({
+        projectIds: [2, 9],
+        fields: [globalField, project2Field, board3Field].map(normalised),
+      });
+      expect(sent(f).url).toBe(`https://api.weeek.net/public/v1/tm/tasks?boardId=3&perPage=${boardFieldSamplePageSize}&all=1`);
+      expect(boardFieldSamplePageSize).toBe(20);
+    });
+
+    it("falls back to a task's own projectId when it has no locations", async () => {
+      const f = jsonFetch(200, { success: true, tasks: [{ ...rawTask, projectId: 7, locations: [], customFields: [globalField] }] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toEqual({ projectIds: [7], fields: [normalised(globalField)] });
+    });
+
+    it("is null for a board without tasks", async () => {
+      const f = jsonFetch(200, { success: true, tasks: [] });
+      expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toBeNull();
+    });
   });
 
   it("get shows custom-field values with option ids turned into option names", async () => {

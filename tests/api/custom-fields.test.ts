@@ -53,14 +53,17 @@ describe("CustomFieldsApi.list", () => {
     expect(await api(jsonFetch(200, {}), { funnels: { list } }).list(funnelScope)).toEqual([field]);
     await expect(api(jsonFetch(200, {}), { funnels: { list } }).list({ kind: "funnel", funnelId: "nope" })).rejects.toThrow(/funnel nope/);
   });
-  it("board samples the board's tasks and subtracts the global and the project fields", async () => {
+  it("board samples the board's tasks and subtracts the global fields and the fields of every project they sit in", async () => {
     const globalField = { ...field, id: "0b1e4d7c-4444-4aaa-8bbb-000000000004", name: "Global" };
     const projectField = { ...field, id: "0b1e4d7c-5555-4aaa-8bbb-000000000005", name: "Project" };
+    const otherProjectField = { ...field, id: "0b1e4d7c-6666-4aaa-8bbb-000000000006", name: "Other project" };
     const f = jsonFetch(200, { success: true, data: [globalField] });
-    const sampleBoardFields = vi.fn(async () => ({ projectId: 2, fields: [globalField, projectField, field] }));
-    const get = vi.fn(async () => ({ id: 2, customFields: [projectField] }));
+    const sampleBoardFields = vi.fn(async () => ({ projectIds: [2, 9], fields: [globalField, projectField, otherProjectField, field] }));
+    const get = vi.fn(async (projectId: number) => ({ id: projectId, customFields: [projectId === 2 ? projectField : otherProjectField] }));
     expect(await api(f, { tasks: { sampleBoardFields }, projects: { get } }).list(boardScope)).toEqual([field]);
     expect(sampleBoardFields).toHaveBeenCalledWith(3);
+    expect(get).toHaveBeenCalledWith(2);
+    expect(get).toHaveBeenCalledWith(9);
   });
   it("board lists nothing when the board has no task", async () => {
     expect(await api(jsonFetch(200, { success: true, data: [rawField] })).list(boardScope)).toEqual([]);
@@ -117,6 +120,13 @@ describe("CustomFieldsApi writes", () => {
     expect(sent(f).url).toBe(url);
     if (body === undefined) expect(sent(f).init.body).toBeUndefined();
     else expect(sent(f).json()).toEqual(body);
+  });
+
+  it("transfer refuses a project into its own project and a board into its own board before sending", async () => {
+    const f = jsonFetch(200, { success: true });
+    await expect(api(f).transfer({ scope: projectScope, fieldId, target: { kind: "project", projectId: 2 } })).rejects.toThrow("the field is already in that project");
+    await expect(api(f).transfer({ scope: boardScope, fieldId, target: { kind: "board", boardId: 3 } })).rejects.toThrow("the field is already in that board");
+    expect(f).not.toHaveBeenCalled();
   });
 
   it("transfer refuses global→global and any funnel field before sending", async () => {

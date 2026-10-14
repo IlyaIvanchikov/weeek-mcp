@@ -90,8 +90,12 @@ function transferRoute(scope: FieldScope, target: TransferTarget): TransferRoute
         case "board": return { operation: operations.globalFields.transferToBoard, body: { boardId: target.boardId } };
         default: { const _exhaustive: never = target; throw new Error(`unhandled transfer target ${String(_exhaustive)}`); }
       }
-    case "project": return scopedTransfer(operations.projectFields, target);
-    case "board": return scopedTransfer(operations.boardFields, target);
+    case "project":
+      if (target.kind === "project" && target.projectId === scope.projectId) throw new Error("the field is already in that project");
+      return scopedTransfer(operations.projectFields, target);
+    case "board":
+      if (target.kind === "board" && target.boardId === scope.boardId) throw new Error("the field is already in that board");
+      return scopedTransfer(operations.boardFields, target);
     default: { const _exhaustive: never = scope; throw new Error(`unhandled field scope ${String(_exhaustive)}`); }
   }
 }
@@ -101,8 +105,8 @@ export class CustomFieldsApi {
 
   /**
    * The fields of one scope. Global, project and funnel fields are listed by the API; a board's
-   * are not listed anywhere, so they are read off one of the board's tasks (every task carries
-   * every field that applies to it) minus the global and the project fields that task inherits.
+   * are not listed anywhere, so they are read off a page of the board's tasks (the fields all of
+   * them carry) minus the global fields and the fields of every project those tasks sit in.
    * A board without tasks lists nothing.
    */
   async list(scope: FieldScope): Promise<CustomField[]> {
@@ -120,8 +124,8 @@ export class CustomFieldsApi {
       case "board": {
         const sample = await this.sources.tasks.sampleBoardFields(scope.boardId);
         if (sample === null) return [];
-        const projectFields = sample.projectId === null ? [] : await this.list({ kind: "project", projectId: sample.projectId });
-        const inherited = new Set([...(await this.list(globalScope)), ...projectFields].map((field) => field.id));
+        const projectLists = await Promise.all(sample.projectIds.map((projectId) => this.list({ kind: "project", projectId })));
+        const inherited = new Set([...(await this.list(globalScope)), ...projectLists.flat()].map((field) => field.id));
         return sample.fields.filter((field) => !inherited.has(field.id));
       }
       default: { const _exhaustive: never = scope; throw new Error(`unhandled field scope ${String(_exhaustive)}`); }

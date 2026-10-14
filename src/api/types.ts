@@ -166,5 +166,5 @@ export type Placement = { after: string } | { before: string };
 /** The id of the funnel is an opaque string (`OLY24hy2mC7n9D9l`), not a UUID — verified live 2026-10-14. */
 export interface Funnel { id: string; name: string; customFields: CustomField[]; }
 
-/** The fields a board's tasks carry, read off one task, with the project that task sits in on that board. */
-export interface BoardFieldSample { projectId: number | null; fields: CustomField[]; }
+/** The fields every task on a board carries, read off a page of its tasks, with every project those tasks sit in. */
+export interface BoardFieldSample { projectIds: number[]; fields: CustomField[]; }

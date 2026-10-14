@@ -23,6 +23,13 @@ export interface TimeEntryRef { taskId: number; timeEntryId: string; }
 
 const ops = operations.tasks;
 
+/**
+ * How many of a board's tasks are read to find its fields: a board's own fields apply to every
+ * task on it, so the intersection over a page cancels the fields that only some tasks carry
+ * from their other locations.
+ */
+export const boardFieldSamplePageSize = 20;
+
 const optionalNumber = (value: unknown): number | null => (value == null ? null : Number(value));
 const optionalString = (value: unknown): string | null => (value == null ? null : String(value));
 
@@ -139,15 +146,24 @@ export class TasksApi {
   }
 
   /**
-   * One task of the board, with every task state, as the only readable source of a board's fields
-   * (see CustomFieldsApi.list). Null when the board has no task at all.
+   * A page of the board's tasks, with every task state, as the only readable source of a board's
+   * fields (see CustomFieldsApi.list): the fields every one of them carries, and every project
+   * they sit in. Null when the board has no task at all.
    */
   async sampleBoardFields(boardId: number): Promise<BoardFieldSample | null> {
-    const json = await this.http.execute<Record<string, unknown>>(ops.list, { query: { boardId, perPage: 1, all: 1 } });
-    const [firstTask] = pickArray(json, "tasks");
+    const json = await this.http.execute<Record<string, unknown>>(ops.list, { query: { boardId, perPage: boardFieldSamplePageSize, all: 1 } });
+    const rawTasks = pickArray(json, "tasks");
+    const [firstTask, ...otherTasks] = rawTasks;
     if (firstTask === undefined) return null;
-    const onThisBoard = toTask(firstTask).locations.find((location) => location.boardId === boardId);
-    return { projectId: onThisBoard?.projectId ?? null, fields: fieldsOf(firstTask) };
+    const idsOfOtherTasks = otherTasks.map((rawTask) => new Set(fieldsOf(rawTask).map((field) => field.id)));
+    const fields = fieldsOf(firstTask).filter((field) => idsOfOtherTasks.every((ids) => ids.has(field.id)));
+    const projectIds = new Set<number>();
+    for (const rawTask of rawTasks) {
+      const task = toTask(rawTask);
+      const taskProjectIds = task.locations.length > 0 ? task.locations.map((location) => location.projectId) : [task.projectId];
+      for (const projectId of taskProjectIds) if (projectId !== null) projectIds.add(projectId);
+    }
+    return { projectIds: [...projectIds], fields };
   }
 
   async get(id: number): Promise<WeeekTask> {
