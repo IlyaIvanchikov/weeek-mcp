@@ -46,9 +46,9 @@ describe("Resolver.resolve", () => {
     await expect(r.resolve({ kind: "project", value: "Ops" })).rejects.toMatchObject({ name: "ResolutionError", candidates: [{ id: 1, name: "Ops" }, { id: 2, name: "ops" }] });
   });
 
-  it("keeps the user-facing label 'assignee' for members", async () => {
+  it("labels members as 'member'", async () => {
     const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u1", name: "Ilya" }] } }), freshCache());
-    await expect(r.resolve({ kind: "member", value: "Nobody" })).rejects.toThrow(/could not resolve assignee "Nobody"/);
+    await expect(r.resolve({ kind: "member", value: "Nobody" })).rejects.toThrow(/could not resolve member "Nobody"/);
   });
 
   it("resolves a board inside its project", async () => {
@@ -60,7 +60,7 @@ describe("Resolver.resolve", () => {
 
   it("refuses to resolve a scoped kind by name without its scope", async () => {
     const r = new Resolver(clientWith({ boards: { list: async () => [] } }), freshCache());
-    await expect(r.resolve({ kind: "board", value: "Main" })).rejects.toThrow(/needs projectId/);
+    await expect(r.resolve({ kind: "board", value: "Main" })).rejects.toThrow(/needs a project \(name or id\)/);
   });
 
   it("resolves a column across all boards of a project", async () => {
@@ -113,7 +113,7 @@ describe("Resolver.resolve", () => {
 
   it("names both scopes a column can be resolved in", async () => {
     const r = new Resolver(clientWith({ columns: { list: async () => [] } }), freshCache());
-    await expect(r.resolve({ kind: "column", value: "Done" })).rejects.toThrow(/needs boardId or projectId/);
+    await expect(r.resolve({ kind: "column", value: "Done" })).rejects.toThrow(/needs a board or a project \(name or id\)/);
   });
 
   it("resolves a tag by its title", async () => {

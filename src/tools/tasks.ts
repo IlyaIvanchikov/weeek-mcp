@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolContext } from "../toolsets/types.js";
-import type { NewTask, TaskPriority, TaskType, WeeekTask } from "../client.js";
+import type { NewTask, ProjectSummary, TaskPriority, TaskType, WeeekTask } from "../client.js";
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
 import { parseDay } from "../dates.js";
@@ -10,7 +10,7 @@ import { taskPriorities, taskTypes } from "../api/constants.js";
 import { priorityCode } from "../api/priority.js";
 import { apiFlag } from "../api/requests.js";
 import { destructiveAnnotations } from "./constants.js";
-import { confirmation, dayMonthYear, nameOrId, nameOrIdList, taskId } from "./inputs.js";
+import { confirmation, dayMonthYear, nameOrId, nameOrIdList, page, taskId } from "./inputs.js";
 import { registerJsonTool } from "./json-tool.js";
 import { jsonReply, imageReply, errorReply } from "./reply.js";
 
@@ -94,8 +94,7 @@ const listShape = {
   completedAtFrom: dayMonthYear.optional(),
   completedAtTo: dayMonthYear.optional(),
   sortBy: z.enum(["name", "type", "priority", "duration", "overdue", "created", "date", "start"]).optional(),
-  limit: z.number().int().min(1).max(50).default(20),
-  offset: z.number().int().min(0).default(0),
+  ...page,
   allPages: z.boolean().default(false),
 };
 type ListArgs = z.infer<z.ZodObject<typeof listShape>>;
@@ -123,9 +122,9 @@ export function buildTaskQuery(args: ListArgs): Record<string, string | number |
 
 export function registerTaskTools({ server, client, resolver, attachPolicy, readPolicy }: ToolContext): void {
   registerJsonTool(server, "weeek_list_projects", {
-    description: "List WEEEK projects: id, name, description, privacy, status, portfolio and team member ids.",
+    description: "List WEEEK projects: id, name, isPrivate, status and portfolioId. Use weeek_get_project for a project's description and team.",
     inputSchema: {},
-  }, async () => client.projects.list());
+  }, async () => (await client.projects.list()).map(({ id, name, isPrivate, status, portfolioId }): ProjectSummary => ({ id, name, isPrivate, status, portfolioId })));
 
   registerJsonTool(server, "weeek_list_boards", {
     description: "List the boards of a WEEEK project (by name or id): id, name, privacy. Use it to find a board for weeek_move_task or weeek_list_columns.",
@@ -240,7 +239,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_update_task", {
     description:
-      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, and `tags` by name or id (replaces the task's tags). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
+      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, and `tags` by name or id (replaces the task's tags; needs at least one name or id). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
     inputSchema: {
       id: taskId,
       title: z.string().optional(),

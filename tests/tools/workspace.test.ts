@@ -83,10 +83,20 @@ describe("workspace tools", () => {
 
   it("weeek_update_tag merges over the current tag so an omitted field survives", async () => {
     const c = client();
-    const update = vi.fn(async () => ({ ...urgent, color: "#0f0" }));
+    const newColor = "#00FF00";
+    const update = vi.fn(async () => ({ ...urgent, color: newColor }));
     const h = toolHarness(registerWorkspaceTools, { ...c, tags: { ...c.tags, update } });
-    await h.call("weeek_update_tag", { tag: "urgent", color: "#0f0" });
-    expect(update).toHaveBeenCalledWith({ tagId: 5, update: { title: "Urgent", color: "#0f0" } });
+    await h.call("weeek_update_tag", { tag: "urgent", color: newColor });
+    expect(update).toHaveBeenCalledWith({ tagId: 5, update: { title: "Urgent", color: newColor } });
+  });
+
+  it("weeek_update_tag rejects a colour that is not #rrggbb before any client call", async () => {
+    const c = client();
+    const update = vi.fn();
+    const h = toolHarness(registerWorkspaceTools, { ...c, tags: { ...c.tags, update } });
+    expect(() => h.call("weeek_update_tag", { tag: "urgent", color: "red" })).toThrow(/hex colour/);
+    expect(c.tags.get).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("weeek_delete_tag needs confirm:true", async () => {
@@ -166,9 +176,9 @@ describe("workspace tools", () => {
     const c = client();
     const update = vi.fn(async () => urgent);
     const h = toolHarness(registerWorkspaceTools, { ...c, tags: { ...c.tags, update } });
-    await h.call("weeek_update_tag", { tag: 5, color: "#111" });
+    await h.call("weeek_update_tag", { tag: 5, color: "#111111" });
     expect(c.tags.get).toHaveBeenCalledTimes(1);
-    expect(update).toHaveBeenCalledWith({ tagId: 5, update: { title: "Urgent", color: "#111" } });
+    expect(update).toHaveBeenCalledWith({ tagId: 5, update: { title: "Urgent", color: "#111111" } });
   });
 
   it("weeek_delete_tag forgets cached tags", async () => {

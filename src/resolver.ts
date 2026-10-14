@@ -55,8 +55,12 @@ export interface ForgetOptions { kind: KindName; scope?: ResolveScope; }
 const INTEGER_RE = /^\d+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function requireScope<T>(value: T | undefined, label: string, field: string): T {
-  if (value === undefined) throw new Error(`resolving a ${label} by name needs ${field}`);
+// Phrased for the tool caller, who passes a name or an id, not the resolver's scope fields.
+const boardScopeNeed = "a project (name or id)";
+const columnScopeNeed = "a board or a project (name or id)";
+
+function requireScope<T>(value: T | undefined, label: string, needed: string): T {
+  if (value === undefined) throw new Error(`resolving a ${label} by name needs ${needed}`);
   return value;
 }
 
@@ -69,30 +73,30 @@ const kinds: KindTable = {
   },
   board: {
     shape: "integer", label: "board", strategy: "list",
-    cacheKey: (scope) => `boards:${requireScope(scope.projectId, "board", "projectId")}`,
+    cacheKey: (scope) => `boards:${requireScope(scope.projectId, "board", boardScopeNeed)}`,
     // The project-wide column aggregate is built from the boards, so a board write dirties it too.
     forgetPrefixes: ({ projectId }) => projectId !== undefined
       ? [`boards:${projectId}`, `columns:${projectId}`]
       : ["boards", "columns"],
-    load: (client, scope) => client.boards.list(requireScope(scope.projectId, "board", "projectId")),
+    load: (client, scope) => client.boards.list(requireScope(scope.projectId, "board", boardScopeNeed)),
   },
   column: {
     shape: "integer", label: "column", strategy: "list",
     cacheKey: (scope) => scope.boardId !== undefined
       ? `board-columns:${scope.boardId}`
-      : `columns:${requireScope(scope.projectId, "column", "boardId or projectId")}`,
+      : `columns:${requireScope(scope.projectId, "column", columnScopeNeed)}`,
     // A boardId cannot be mapped to its project without a fetch, so both families go entirely.
     forgetPrefixes: () => ["board-columns", "columns"],
     load: async (client, scope) => {
       if (scope.boardId !== undefined) return client.columns.list(scope.boardId);
-      const boards = await client.boards.list(requireScope(scope.projectId, "column", "boardId or projectId"));
+      const boards = await client.boards.list(requireScope(scope.projectId, "column", columnScopeNeed));
       const all: Named<number>[] = [];
       for (const board of boards) all.push(...(await client.columns.list(board.id)));
       return all;
     },
   },
   member: {
-    shape: "uuid", label: "assignee", strategy: "list",
+    shape: "uuid", label: "member", strategy: "list",
     cacheKey: () => "members",
     forgetPrefixes: () => ["members"],
     load: (client) => client.workspace.listMembers(),
@@ -108,6 +112,7 @@ const kinds: KindTable = {
     shape: "integer", label: "portfolio", strategy: "search",
     cacheKey: () => "portfolios",
     forgetPrefixes: () => ["portfolios"],
+    // Only the first searchPageSize matches are considered, so an exact match beyond them is reported as not found, with candidates.
     load: async (client, _scope, query) => (await client.portfolios.list({ search: query, limit: searchPageSize })).portfolios,
   },
 };

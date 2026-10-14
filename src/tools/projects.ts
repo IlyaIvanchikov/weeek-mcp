@@ -92,9 +92,9 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
     inputSchema: { board: nameOrId, project: nameOrId.optional(), name: z.string().min(1) },
   }, async (args) => {
     const { boardId, projectId } = await resolveBoard(resolver, args);
-    const renamedBoard = await client.boards.update({ boardId, name: args.name });
+    const renameResponse = await client.boards.update({ boardId, name: args.name });
     resolver.forget({ kind: "board", scope: { projectId } });
-    return renamedBoard;
+    return renameResponse;
   });
 
   registerJsonTool(server, "weeek_delete_board", {
@@ -122,7 +122,7 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
     description: "Create a column on a WEEEK board. Pass the board by id, or by name together with its `project`.",
     inputSchema: { board: nameOrId, project: nameOrId.optional(), name: z.string().min(1) },
   }, async (args) => {
-    const { boardId, projectId } = await resolveBoard(resolver, args);
+    const { boardId } = await resolveBoard(resolver, args);
     const column = await client.columns.create({ name: args.name, boardId });
     resolver.forget({ kind: "column" });
     return column;
@@ -132,10 +132,10 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
     description: "Rename a WEEEK board column. Pass the column by id, or by name together with its `board` (and `project` when the board is a name).",
     inputSchema: { column: nameOrId, board: nameOrId.optional(), project: nameOrId.optional(), name: z.string().min(1) },
   }, async (args) => {
-    const { columnId, boardId, projectId } = await resolveColumn(resolver, args);
-    const renamedColumn = await client.columns.update({ columnId, name: args.name });
+    const { columnId } = await resolveColumn(resolver, args);
+    const renameResponse = await client.columns.update({ columnId, name: args.name });
     resolver.forget({ kind: "column" });
-    return renamedColumn;
+    return renameResponse;
   });
 
   registerJsonTool(server, "weeek_delete_column", {
@@ -143,7 +143,7 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
     inputSchema: { column: nameOrId, board: nameOrId.optional(), project: nameOrId.optional(), confirm: confirmation },
     annotations: destructiveAnnotations,
   }, async (args) => {
-    const { columnId, boardId, projectId } = await resolveColumn(resolver, args);
+    const { columnId } = await resolveColumn(resolver, args);
     const removal = await client.columns.remove(columnId);
     resolver.forget({ kind: "column" });
     return removal;

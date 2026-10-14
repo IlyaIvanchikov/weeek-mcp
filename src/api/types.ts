@@ -86,6 +86,8 @@ export interface Project {
   /** Member ids. */
   team: string[];
 }
+/** What weeek_list_projects returns; description and team come from weeek_get_project. */
+export type ProjectSummary = Pick<Project, "id" | "name" | "isPrivate" | "status" | "portfolioId">;
 export interface NewProject { name: string; isPrivate: boolean; description?: string; portfolioId?: number; }
 /** PUT /tm/projects/{id} replaces: the API requires name and isPrivate even when unchanged. */
 export interface ProjectUpdate { name: string; isPrivate: boolean; color?: string; }

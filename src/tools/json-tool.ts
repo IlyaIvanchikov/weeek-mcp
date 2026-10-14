@@ -12,7 +12,8 @@ export interface JsonToolConfig<Shape extends ZodRawShapeCompat> {
 /**
  * Registers a tool whose handler returns the value to serialise, or throws. Every throw — a
  * ResolutionError with its candidates, an API error, a bad argument — becomes an error reply,
- * so a handler holds only its happy path. Typed like the SDK's own ToolCallback. Positional like the SDK's registerTool it wraps.
+ * so a handler holds only its happy path. Typed like the SDK's own ToolCallback.
+ * Positional like the SDK's registerTool it wraps.
  */
 export function registerJsonTool<Shape extends ZodRawShapeCompat>(
   server: McpServer,

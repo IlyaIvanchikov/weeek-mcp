@@ -12,3 +12,5 @@ export const page = {
   limit: z.number().int().min(1).max(50).default(20),
   offset: z.number().int().min(0).default(0),
 };
+/** A colour as the tag colour field takes it: # and six hex digits. */
+export const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "a hex colour like #1E88E5");

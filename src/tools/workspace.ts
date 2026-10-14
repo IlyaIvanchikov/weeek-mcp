@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolContext } from "../toolsets/types.js";
 import { destructiveAnnotations } from "./constants.js";
-import { confirmation, nameOrId, page } from "./inputs.js";
+import { confirmation, hexColor, nameOrId, page } from "./inputs.js";
 import { registerJsonTool } from "./json-tool.js";
 
 /** Workspace-level things: portfolios, tags, the workspace itself, the token's owner. */
@@ -71,7 +71,7 @@ export function registerWorkspaceTools({ server, client, resolver }: ToolContext
 
   registerJsonTool(server, "weeek_update_tag", {
     description: "Change a WEEEK tag's title or colour (tag by title or id). Fields you omit keep their current value.",
-    inputSchema: { tag: nameOrId, title: z.string().min(1).optional(), color: z.string().min(1).optional() },
+    inputSchema: { tag: nameOrId, title: z.string().min(1).optional(), color: hexColor.optional() },
   }, async (args) => {
     const tagId = await resolver.resolve({ kind: "tag", value: args.tag });
     // PUT replaces both fields, so the current tag is read first.
