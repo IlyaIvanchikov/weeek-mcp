@@ -23,6 +23,7 @@ const normalisedTask = {
   locations: [{ projectId: 2, boardId: 3, boardColumnId: 8 }],
   timeEntries: [{ id: "te1", userId: "u1", date: "2026-07-20", duration: 30, isOvertime: false, comment: "" }],
   attachments: [],
+  customFields: [],
 };
 
 describe("TasksApi", () => {
@@ -248,5 +249,25 @@ describe("TasksApi", () => {
   it("sampleBoardFields is null for a board without tasks", async () => {
     const f = jsonFetch(200, { success: true, tasks: [] });
     expect(await new TasksApi(httpWith(f)).sampleBoardFields(3)).toBeNull();
+  });
+
+  it("get shows custom-field values with option ids turned into option names", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "o1", name: "Review", color: "blue" }], value: "o1" };
+    const tags = { id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Areas", type: "multiselect", options: [{ id: "a", name: "API", color: "red" }], value: ["a", "zz"] };
+    const estimate = { id: "0b1e4d7c-3333-4aaa-8bbb-000000000003", name: "Estimate", type: "number", options: [], value: 5 };
+    const empty = { id: "0b1e4d7c-4444-4aaa-8bbb-000000000004", name: "Notes", type: "text", options: [], value: null };
+    const f = jsonFetch(200, { success: true, task: { ...rawTask, customFields: [stage, tags, estimate, empty] } });
+    expect((await new TasksApi(httpWith(f)).get(78)).customFields).toEqual([
+      { id: stage.id, name: "Stage", type: "select", value: "Review" },
+      { id: tags.id, name: "Areas", type: "multiselect", value: ["API", "zz"] },
+      { id: estimate.id, name: "Estimate", type: "number", value: 5 },
+      { id: empty.id, name: "Notes", type: "text", value: null },
+    ]);
+  });
+
+  it("create sends customFields when given", async () => {
+    const f = jsonFetch(200, { success: true, task: rawTask });
+    await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, customFields: { "0b1e4d7c-1111-4aaa-8bbb-000000000001": "o1" } });
+    expect(sent(f).json()).toEqual({ title: "T", locations: [{ projectId: 1 }], customFields: { "0b1e4d7c-1111-4aaa-8bbb-000000000001": "o1" } });
   });
 });

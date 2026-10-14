@@ -2,7 +2,9 @@ import { z } from "zod";
 
 /** A reference the resolver turns into an id: the thing's name, or its id passed straight through. */
 export const nameOrId = z.union([z.string(), z.number()]);
-export const nameOrIdList = z.array(nameOrId).min(1).max(50);
+/** The most names or ids one list parameter takes. */
+export const nameOrIdListCap = 50;
+export const nameOrIdList = z.array(nameOrId).min(1).max(nameOrIdListCap);
 /** The gate on every destructive tool: the schema rejects the call unless confirm is literally true. */
 export const confirmation = z.literal(true).describe("Must be true to confirm this irreversible action.");
 export const taskId = z.number().int();

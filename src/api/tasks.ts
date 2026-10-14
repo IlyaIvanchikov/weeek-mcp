@@ -5,7 +5,7 @@ import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
 import { toCustomField } from "./custom-fields.js";
-import type { Attachment, BoardFieldSample, CommentsPage, CustomField, NewTask, SuccessResponse, TaskComment, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
+import type { Attachment, BoardFieldSample, CommentsPage, CustomField, CustomFieldOption, FieldValue, NewTask, SuccessResponse, TaskComment, TaskFieldValue, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -57,6 +57,25 @@ function fieldsOf(rawTask: unknown): CustomField[] {
   return Array.isArray(fields) ? fields.map(toCustomField) : [];
 }
 
+/** Option ids read as option names; everything else as sent, coerced into the shapes a caller may pass back. */
+function displayValue(value: unknown, options: CustomFieldOption[]): FieldValue {
+  const named = (item: unknown): string => {
+    const option = options.find((candidate) => candidate.id === item);
+    if (option) return option.name;
+    const r = asRecord(item);
+    return String(r.name ?? r.id ?? item);
+  };
+  if (value == null) return null;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(named);
+  return named(value);
+}
+
+function toFieldValue(raw: unknown): TaskFieldValue {
+  const field = toCustomField(raw);
+  return { id: field.id, name: field.name, type: field.type, value: displayValue(asRecord(raw).value, field.options) };
+}
+
 function toTask(raw: unknown): WeeekTask {
   const r = asRecord(raw);
   return {
@@ -86,6 +105,7 @@ function toTask(raw: unknown): WeeekTask {
     // The API returns these with every task; surfacing them is what lets a caller see a
     // screenshot-only description instead of silently working from the prose.
     attachments: Array.isArray(r.attachments) ? (r.attachments as Attachment[]) : [],
+    customFields: Array.isArray(r.customFields) ? r.customFields.map(toFieldValue) : [],
   };
 }
 
@@ -107,6 +127,7 @@ export class TasksApi {
     if (newTask.priority !== undefined) payload.priority = newTask.priority;
     if (newTask.type !== undefined) payload.type = newTask.type;
     if (newTask.parentId !== undefined) payload.parentId = newTask.parentId;
+    if (newTask.customFields !== undefined) payload.customFields = newTask.customFields;
     const json = await this.http.execute<{ task: unknown }>(ops.create, { body: payload });
     return toTask(json.task);
   }

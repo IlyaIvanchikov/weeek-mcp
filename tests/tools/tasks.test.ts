@@ -439,4 +439,34 @@ describe("task tools", () => {
     await h.get("weeek_list_tasks")!({ completed: true, all: true });
     expect(list.mock.calls[0][0]).toMatchObject({ completed: 1, all: 1 });
   });
+
+  it("create_task resolves fields against the global and the project lists and sends customFields", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
+    const estimate = { id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Estimate", type: "number", config: null, options: [] };
+    const list = vi.fn(async (scope: { kind: string }) => (scope.kind === "global" ? [estimate] : [stage]));
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, customFields: { list }, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "x", project: "Marketing", fields: { Stage: "review", Estimate: 3 } });
+    expect(list).toHaveBeenCalledWith({ kind: "global" });
+    expect(list).toHaveBeenCalledWith({ kind: "project", projectId: 1 });
+    expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, customFields: { [stage.id]: "o1", [estimate.id]: 3 } });
+  });
+
+  it("update_task reads the task's own fields, then sends customFields", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
+    const getFields = vi.fn(async (_id: number) => [stage]);
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Review" }, title: "New" });
+    expect(getFields).toHaveBeenCalledWith(3);
+    expect(update).toHaveBeenCalledWith(3, { title: "New", customFields: { [stage.id]: "o1" } });
+  });
+
+  it("update_task does not read the task when no fields are given", async () => {
+    const getFields = vi.fn();
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    await h.get("weeek_update_task")!({ id: 3, title: "New" });
+    expect(getFields).not.toHaveBeenCalled();
+  });
 });

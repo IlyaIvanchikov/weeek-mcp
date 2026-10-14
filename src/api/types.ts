@@ -69,6 +69,7 @@ export interface WeeekTask {
   locations: TaskLocation[];
   timeEntries: TimeEntry[];
   attachments: Attachment[];
+  customFields: TaskFieldValue[];
 }
 
 export interface NewTask {
@@ -78,6 +79,8 @@ export interface NewTask {
   priority?: TaskPriorityCode;
   type?: TaskType;
   parentId?: number;
+  /** Field ids to wire values; built by encodeTaskFields. */
+  customFields?: Record<string, unknown>;
 }
 
 export type ProjectStatus = (typeof projectStatuses)[number];
@@ -129,6 +132,10 @@ export interface BooleanFieldConfig { type: BooleanStyle; }
 /** Only number and boolean fields carry settings; the two are told apart by `type`. */
 export type FieldConfig = NumberFieldConfig | BooleanFieldConfig;
 
+/** What a caller may pass for one field, and what a task shows back: option ids read as option names. null clears. */
+export type FieldValue = string | number | boolean | string[] | null;
+/** A custom field as a task carries it. */
+export interface TaskFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
 export interface CustomFieldOption { id: string; name: string; color: string; }
 export interface CustomField {
   id: string;
