@@ -22,8 +22,8 @@ export type TransferArgs = z.infer<z.ZodObject<typeof transferShape>>;
 
 interface BoardRef { board: string | number; project?: string | number; }
 
-function requireOwner<T>(value: T | undefined, scope: string, parameter: string): T {
-  if (value === undefined) throw new Error(`scope "${scope}" needs \`${parameter}\` (name or id)`);
+function requireOwner<T>(value: T | undefined, where: string, parameter: string): T {
+  if (value === undefined) throw new Error(`${where} needs \`${parameter}\` (name or id)`);
   return value;
 }
 
@@ -36,9 +36,9 @@ async function resolveBoard(resolver: Resolver, { board, project }: BoardRef): P
 export async function parseFieldScope(resolver: Resolver, args: FieldScopeArgs): Promise<FieldScope> {
   switch (args.scope) {
     case "global": return { kind: "global" };
-    case "project": return { kind: "project", projectId: await resolver.resolve({ kind: "project", value: requireOwner(args.project, "project", "project") }) };
-    case "board": return { kind: "board", boardId: await resolveBoard(resolver, { board: requireOwner(args.board, "board", "board"), project: args.project }) };
-    case "funnel": return { kind: "funnel", funnelId: await resolver.resolve({ kind: "funnel", value: requireOwner(args.funnel, "funnel", "funnel") }) };
+    case "project": return { kind: "project", projectId: await resolver.resolve({ kind: "project", value: requireOwner(args.project, 'scope "project"', "project") }) };
+    case "board": return { kind: "board", boardId: await resolveBoard(resolver, { board: requireOwner(args.board, 'scope "board"', "board"), project: args.project }) };
+    case "funnel": return { kind: "funnel", funnelId: await resolver.resolve({ kind: "funnel", value: requireOwner(args.funnel, 'scope "funnel"', "funnel") }) };
     default: { const _exhaustive: never = args.scope; throw new Error(`unhandled scope ${String(_exhaustive)}`); }
   }
 }
@@ -46,8 +46,8 @@ export async function parseFieldScope(resolver: Resolver, args: FieldScopeArgs):
 export async function parseTransferTarget(resolver: Resolver, args: TransferArgs): Promise<TransferTarget> {
   switch (args.to) {
     case "global": return { kind: "global" };
-    case "project": return { kind: "project", projectId: await resolver.resolve({ kind: "project", value: requireOwner(args.to_project, "project", "to_project") }) };
-    case "board": return { kind: "board", boardId: await resolveBoard(resolver, { board: requireOwner(args.to_board, "board", "to_board"), project: args.to_project }) };
+    case "project": return { kind: "project", projectId: await resolver.resolve({ kind: "project", value: requireOwner(args.to_project, 'to:"project"', "to_project") }) };
+    case "board": return { kind: "board", boardId: await resolveBoard(resolver, { board: requireOwner(args.to_board, 'to:"board"', "to_board"), project: args.to_project }) };
     default: { const _exhaustive: never = args.to; throw new Error(`unhandled transfer target ${String(_exhaustive)}`); }
   }
 }
@@ -90,8 +90,9 @@ export function buildFieldConfig({ type, args, current = null }: BuildFieldConfi
       const base = current !== null && "precision" in current ? current : null;
       if (!hasNumberArgs) return undefined;
       const config: NumberFieldConfig = { type: args.number_format ?? base?.type ?? "number", precision: args.precision ?? base?.precision ?? 0 };
+      // A currency id only means something to a currency field; a stale one would ride along into another format.
       const currency = args.currency_id ?? base?.currency;
-      if (currency !== undefined) config.currency = currency;
+      if (config.type === "currency" && currency !== undefined) config.currency = currency;
       return config;
     }
     case "boolean":

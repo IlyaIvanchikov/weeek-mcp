@@ -462,6 +462,17 @@ describe("task tools", () => {
     expect(update).toHaveBeenCalledWith(3, { title: "New", customFields: { [stage.id]: "o1" } });
   });
 
+  it("update_task refuses a misspelt option with candidates and never updates", async () => {
+    const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }, { id: "o2", name: "Done", color: "green" }] };
+    const getFields = vi.fn(async (_id: number) => [stage]);
+    const update = vi.fn();
+    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    const res = await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Reviw" } });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text)).toHaveProperty("candidates");
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("update_task does not read the task when no fields are given", async () => {
     const getFields = vi.fn();
     const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));

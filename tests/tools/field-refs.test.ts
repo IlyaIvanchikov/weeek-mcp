@@ -36,7 +36,8 @@ describe("parseTransferTarget", () => {
     expect(await parseTransferTarget(r, { to: "global" })).toEqual({ kind: "global" });
     expect(await parseTransferTarget(r, { to: "project", to_project: "Marketing" })).toEqual({ kind: "project", projectId: 1 });
     expect(await parseTransferTarget(r, { to: "board", to_board: "Main", to_project: "Marketing" })).toEqual({ kind: "board", boardId: 10 });
-    await expect(parseTransferTarget(r, { to: "board" })).rejects.toThrow(/needs `to_board`/);
+    await expect(parseTransferTarget(r, { to: "board" })).rejects.toThrow('to:"board" needs `to_board` (name or id)');
+    await expect(parseTransferTarget(r, { to: "project" })).rejects.toThrow('to:"project" needs `to_project` (name or id)');
   });
 });
 
@@ -46,6 +47,11 @@ describe("buildFieldConfig", () => {
     expect(buildFieldConfig({ type: "number", args: { number_format: "currency", currency_id: 3 } })).toEqual({ type: "currency", precision: 0, currency: 3 });
     expect(buildFieldConfig({ type: "number", args: { precision: 1 }, current: { type: "percent", precision: 0 } })).toEqual({ type: "percent", precision: 1 });
     expect(buildFieldConfig({ type: "number", args: {} })).toBeUndefined();
+  });
+  it("drops a stale currency id when the format is no longer currency, and keeps it for currency", () => {
+    const current = { type: "currency", precision: 0, currency: 3 } as const;
+    expect(buildFieldConfig({ type: "number", args: { number_format: "percent" }, current })).toEqual({ type: "percent", precision: 0 });
+    expect(buildFieldConfig({ type: "number", args: { number_format: "currency", currency_id: 3 }, current })).toEqual({ type: "currency", precision: 0, currency: 3 });
   });
   it("builds a boolean config only when a style is given", () => {
     expect(buildFieldConfig({ type: "boolean", args: { boolean_style: "radio" } })).toEqual({ type: "radio" });

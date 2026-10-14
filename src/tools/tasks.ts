@@ -258,7 +258,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_update_task", {
     description:
-      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, `tags` by name or id (replaces the task's tags; an empty list clears them), and `fields`: custom-field values by field name (select options and members by name too; null clears). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
+      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, `tags` by name or id (replaces the task's tags; an empty list clears them), and `fields`: custom-field values by field name (select options and members by name too; null clears; other fields keep their values). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
     inputSchema: updateShape,
   }, async (args) => {
     const taskFields = args.fields === undefined ? [] : await client.tasks.getFields(args.id);

@@ -75,6 +75,33 @@ describe("custom-field tools", () => {
     expect(c.customFields.update).not.toHaveBeenCalled();
   });
 
+  it("weeek_update_custom_field refuses a call that changes nothing, before any call", async () => {
+    const { c, h } = harness();
+    const res = await h.call("weeek_update_custom_field", { scope: "global", field: "Stage" });
+    expect(res.isError).toBe(true);
+    expect(reply(res).error).toBe("nothing to change: pass name or a setting");
+    expect(c.customFields.list).not.toHaveBeenCalled();
+    expect(c.customFields.update).not.toHaveBeenCalled();
+  });
+
+  it("weeek_update_field_option refuses a call that changes nothing, before any call", async () => {
+    const { c, h } = harness();
+    const res = await h.call("weeek_update_field_option", { scope: "global", field: "Stage", option: "Review" });
+    expect(res.isError).toBe(true);
+    expect(reply(res).error).toBe("nothing to change: pass name or color");
+    expect(c.customFields.list).not.toHaveBeenCalled();
+    expect(c.customFields.updateOption).not.toHaveBeenCalled();
+  });
+
+  it("weeek_delete_custom_field looks only inside the given scope and refuses a field that lives elsewhere", async () => {
+    const { c, h } = harness();
+    c.customFields.list.mockImplementation(async (scope: FieldScope) => (scope.kind === "global" ? [estimate] : []));
+    const res = await h.call("weeek_delete_custom_field", { scope: "board", board: 10, field: "Estimate", confirm: true });
+    expect(res.isError).toBe(true);
+    expect(reply(res).error).toMatch(/could not resolve custom field "Estimate"/);
+    expect(c.customFields.remove).not.toHaveBeenCalled();
+  });
+
   it("weeek_delete_custom_field needs confirm:true", async () => {
     const { c, h } = harness();
     expect(() => h.call("weeek_delete_custom_field", { scope: "global", field: "Stage" })).toThrow(/confirm/);

@@ -48,6 +48,8 @@ export function registerCustomFieldTools({ server, client, resolver }: ToolConte
     description: "Rename a custom field (by name or id, inside its scope) or change its number/boolean settings; settings you omit keep their value. The type cannot change.",
     inputSchema: { ...fieldRef, name: nameText.optional(), ...fieldConfigShape },
   }, async (args) => {
+    const hasSetting = args.number_format !== undefined || args.precision !== undefined || args.currency_id !== undefined || args.boolean_style !== undefined;
+    if (args.name === undefined && !hasSetting) throw new Error("nothing to change: pass name or a setting");
     const { scope, field } = await findField(resolver, args);
     const config = buildFieldConfig({ type: field.type, args, current: field.config });
     const updated = await client.customFields.update({ scope, fieldId: field.id, update: { name: args.name, config } });
@@ -103,6 +105,7 @@ export function registerCustomFieldTools({ server, client, resolver }: ToolConte
     description: "Rename or recolour one choice of a select/multiselect custom field (option by name or id). Fields you omit keep their current value.",
     inputSchema: { ...optionRef, name: nameText.optional(), color: optionColor.optional() },
   }, async (args) => {
+    if (args.name === undefined && args.color === undefined) throw new Error("nothing to change: pass name or color");
     const { scope, field } = await findField(resolver, args);
     const current = pickOption(field, args.option);
     // PUT replaces both fields; the current option is already in hand from the field's list.
