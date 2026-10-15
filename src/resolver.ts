@@ -1,8 +1,9 @@
 import type { WeeekClient } from "./client.js";
 import type { NameCache } from "./cache.js";
-import type { CustomField, FieldScope, Funnel } from "./api/types.js";
+import type { Contact, Currency, CustomField, Deal, FieldScope, Funnel, FunnelStatus, Organization } from "./api/types.js";
 import { globalScope } from "./api/custom-fields.js";
 import { ResolutionError, type Candidate } from "./errors.js";
+import { mapWithLimit } from "./concurrency.js";
 
 /**
  * How an id looks on the wire. An opaque id (a funnel's "OLY24hy2mC7n9D9l") has no pattern a
@@ -14,10 +15,12 @@ export type LoadStrategy = "list" | "search";
 // A server-side search is never paged in full: this many candidates is plenty to pick one
 // exact match from or to show as suggestions.
 const searchPageSize = 50;
+// Deal searches fan out over a funnel's statuses; this many run at once (spec §4).
+const dealSearchConcurrency = 5;
 
 export interface Named<Id extends number | string> { id: Id; name: string; }
 /** The ids a load may depend on; each kind reads the ones it needs and ignores the rest. */
-export interface ResolveScope { projectId?: number; boardId?: number; fieldScope?: FieldScope; }
+export interface ResolveScope { projectId?: number; boardId?: number; fieldScope?: FieldScope; funnelId?: string; statusId?: string; }
 
 /** What the resolver needs to know about one kind of named thing, and what its load returns. */
 interface KindBase<Entry extends Named<number | string>> {
@@ -28,6 +31,12 @@ interface KindBase<Entry extends Named<number | string>> {
   /** Cache prefix; must include every scope id the load depends on. A search kind caches under `${prefix}:${query}`. */
   cacheKey(scope: ResolveScope): string;
   load(client: WeeekClient, scope: ResolveScope, query: string): Promise<Entry[]>;
+  /**
+   * Fetch one entry straight by id, for kinds whose collection is searched rather than listed:
+   * a value that looks like an id is tried here before any search, and null means "not an id
+   * after all" so the value is searched as a name.
+   */
+  lookup?(client: WeeekClient, value: string): Promise<Entry | null>;
   /**
    * Every cache prefix a write to this kind makes stale. Never throws: a missing scope widens
    * to the bare prefixes (drop more, re-read once) instead of failing the write that called it.
@@ -49,6 +58,11 @@ interface KindTable {
   portfolio: IntegerKind;
   funnel: OpaqueKind<Funnel>;
   customField: UuidKind<CustomField>;
+  status: OpaqueKind<FunnelStatus>;
+  deal: OpaqueKind<Deal & Named<string>>;
+  organization: UuidKind<Organization>;
+  contact: UuidKind<Contact>;
+  currency: IntegerKind<Currency>;
 }
 export type KindName = keyof KindTable;
 /** The entry type a kind's load returns — what `find` and `list` hand back. */
@@ -65,10 +79,14 @@ export interface ForgetOptions { kind: KindName; scope?: ResolveScope; }
 
 const INTEGER_RE = /^\d+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Funnel, status and deal ids: 16 letters and digits, verified live. A title can look the same, so a match only earns a lookup, never a passthrough.
+const OPAQUE_ID_RE = /^[A-Za-z0-9]{16}$/;
 
 // Phrased for the tool caller, who passes a name or an id, not the resolver's scope fields.
 const boardScopeNeed = "a project (name or id)";
 const columnScopeNeed = "a board or a project (name or id)";
+const statusScopeNeed = "a funnel (name or id)";
+const dealScopeNeed = "a funnel or a status (name or id)";
 
 function requireScope<T>(value: T | undefined, label: string, needed: string): T {
   if (value === undefined) throw new Error(`resolving a ${label} by name needs ${needed}`);
@@ -150,6 +168,55 @@ const kinds: KindTable = {
     forgetPrefixes: () => ["fields"],
     load: (client, scope) => client.customFields.list(scope.fieldScope ?? globalScope),
   },
+  status: {
+    shape: "opaque", label: "status", strategy: "list",
+    cacheKey: (scope) => `statuses:${requireScope(scope.funnelId, "status", statusScopeNeed)}`,
+    forgetPrefixes: ({ funnelId }) => (funnelId !== undefined ? [`statuses:${funnelId}`] : ["statuses"]),
+    // A status id is fetched straight, so a caller with an id needs no funnel; a name needs one.
+    lookup: (client, value) => (OPAQUE_ID_RE.test(value) ? client.crm.statuses.tryGet(value) : Promise.resolve(null)),
+    load: (client, scope) => client.crm.statuses.list(requireScope(scope.funnelId, "status", statusScopeNeed)),
+  },
+  deal: {
+    shape: "opaque", label: "deal", strategy: "search",
+    cacheKey: (scope) => scope.statusId !== undefined
+      ? `deals:status:${scope.statusId}`
+      : `deals:funnel:${requireScope(scope.funnelId, "deal", dealScopeNeed)}`,
+    // A deal moved between statuses would stay in its old status's cached search, so every deal search goes.
+    forgetPrefixes: () => ["deals"],
+    lookup: async (client, value) => {
+      const deal = OPAQUE_ID_RE.test(value) ? await client.crm.deals.tryGet(value) : null;
+      return deal && { ...deal, name: deal.title };
+    },
+    load: async (client, scope, query) => {
+      const statusIds = scope.statusId !== undefined
+        ? [scope.statusId]
+        : (await client.crm.statuses.list(requireScope(scope.funnelId, "deal", dealScopeNeed))).map((status) => status.id);
+      const pages = await mapWithLimit(statusIds, dealSearchConcurrency, (statusId) => client.crm.deals.list({ statusId, query: { search: query, limit: searchPageSize } }));
+      // Deals carry `title`; the resolver matches on `name`.
+      return pages.flatMap((page) => page.deals).map((deal) => ({ ...deal, name: deal.title }));
+    },
+  },
+  organization: {
+    shape: "uuid", label: "organization", strategy: "search",
+    cacheKey: () => "organizations",
+    forgetPrefixes: () => ["organizations"],
+    lookup: (client, value) => (UUID_RE.test(value) ? client.crm.organizations.tryGet(value) : Promise.resolve(null)),
+    load: async (client, _scope, query) => (await client.crm.organizations.list({ search: query, limit: searchPageSize })).organizations,
+  },
+  contact: {
+    shape: "uuid", label: "contact", strategy: "search",
+    cacheKey: () => "contacts",
+    forgetPrefixes: () => ["contacts"],
+    lookup: (client, value) => (UUID_RE.test(value) ? client.crm.contacts.tryGet(value) : Promise.resolve(null)),
+    load: async (client, _scope, query) => (await client.crm.contacts.list({ search: query, limit: searchPageSize })).contacts,
+  },
+  currency: {
+    shape: "integer", label: "currency", strategy: "list",
+    cacheKey: () => "currencies",
+    forgetPrefixes: () => ["currencies"],
+    // Matched by code (USD), the way a caller names a currency.
+    load: async (client) => (await client.crm.currencies.list()).map((currency) => ({ ...currency, name: currency.code })),
+  },
 };
 
 export class Resolver {
@@ -178,11 +245,15 @@ export class Resolver {
     return this.load(kind, scope, "");
   }
 
-  /** The entry a name or an id denotes — the whole thing, for callers that need more than the id. Always loads. */
+  /** The entry a name or an id denotes — the whole thing, for callers that need more than the id. */
   async find<K extends KindName>({ kind, value, scope = {} }: ResolveOptions<K>): Promise<EntryOf<K>> {
     const query = String(value).trim();
+    const kindDefinition: Kind = kinds[kind];
+    const found = await kindDefinition.lookup?.(this.client, query);
+    // The kind that answered a lookup is the kind asked for; the union hides that from the compiler.
+    if (found) return found as unknown as EntryOf<K>;
     const entries = await this.load(kind, scope, query);
-    return Resolver.pickEntry(kinds[kind].label, query, entries);
+    return Resolver.pickEntry(kindDefinition.label, query, entries);
   }
 
   /** The id a name or an id denotes. An id of the kind's shape passes through without a load. */
