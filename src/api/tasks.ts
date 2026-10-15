@@ -1,6 +1,6 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
-import { apiFlag } from "./requests.js";
+import { apiFlag, attachmentForm, pickAttachments } from "./requests.js";
 import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
@@ -64,7 +64,7 @@ function fieldsOf(rawTask: unknown): CustomField[] {
   return Array.isArray(fields) ? fields.map(toCustomField) : [];
 }
 
-function toTask(raw: unknown): WeeekTask {
+export function toTask(raw: unknown): WeeekTask {
   const r = asRecord(raw);
   return {
     id: Number(r.id),
@@ -175,14 +175,8 @@ export class TasksApi {
   }
 
   async uploadAttachment({ taskId, filename, bytes }: UploadAttachmentOptions): Promise<Attachment[]> {
-    const form = new FormData();
-    const blob = bytes instanceof Blob ? bytes : new Blob([bytes as BlobPart]);
-    form.append("files[]", blob, filename);
-    const json = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId }, body: form });
-    // The spec documents `data` as one Attachment; accept a list too — `files[]` is a
-    // multipart array and the live shape has not been pinned down (FOLLOWUPS #18).
-    if (Array.isArray(json.data)) return json.data as Attachment[];
-    return json.data ? [json.data as Attachment] : [];
+    const json = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId }, body: attachmentForm({ filename, bytes }) });
+    return pickAttachments(json);
   }
 
   async listComments({ taskId, limit, offset }: ListCommentsOptions): Promise<CommentsPage> {

@@ -12,6 +12,7 @@ import { CustomFieldsApi } from "./api/custom-fields.js";
 import { FunnelsApi } from "./api/crm/funnels.js";
 import { StatusesApi } from "./api/crm/statuses.js";
 import { CurrenciesApi } from "./api/crm/currencies.js";
+import { DealsApi } from "./api/crm/deals.js";
 
 export type * from "./api/types.js";
 
@@ -30,7 +31,7 @@ export class WeeekClient {
   readonly tags: TagsApi;
   readonly portfolios: PortfoliosApi;
   readonly customFields: CustomFieldsApi;
-  readonly crm: { funnels: FunnelsApi; statuses: StatusesApi; currencies: CurrenciesApi };
+  readonly crm: { funnels: FunnelsApi; statuses: StatusesApi; currencies: CurrenciesApi; deals: DealsApi };
 
   constructor(cfg: HttpConfig, fetchImpl: typeof fetch = fetch) {
     const http = new HttpClient(cfg, fetchImpl);
@@ -43,7 +44,7 @@ export class WeeekClient {
     this.user = new UserApi(http);
     this.tags = new TagsApi(http);
     this.portfolios = new PortfoliosApi(http);
-    this.crm = { funnels: new FunnelsApi(http), statuses: new StatusesApi(http), currencies: new CurrenciesApi(http) };
+    this.crm = { funnels: new FunnelsApi(http), statuses: new StatusesApi(http), currencies: new CurrenciesApi(http), deals: new DealsApi(http) };
     this.customFields = new CustomFieldsApi(http, { projects: this.projects, tasks: this.tasks, funnels: this.crm.funnels });
   }
 }
