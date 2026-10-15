@@ -24,5 +24,14 @@ export const customFieldToolNames = [
   "weeek_add_field_option", "weeek_update_field_option", "weeek_delete_field_option", "weeek_move_field_option",
 ].sort();
 
+export const crmToolNames = [
+  "weeek_list_funnels", "weeek_get_funnel", "weeek_create_funnel", "weeek_update_funnel", "weeek_delete_funnel",
+  "weeek_list_statuses", "weeek_get_status", "weeek_create_status", "weeek_update_status", "weeek_delete_status",
+  "weeek_list_currencies",
+  "weeek_list_deals", "weeek_get_deal", "weeek_create_deal", "weeek_update_deal", "weeek_delete_deal", "weeek_move_deal",
+  "weeek_add_deal_assignees", "weeek_remove_deal_assignees", "weeek_attach_organization", "weeek_detach_organization",
+  "weeek_add_deal_task", "weeek_move_deal_task", "weeek_remove_deal_task", "weeek_attach_deal_file",
+].sort();
+
 /** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
-export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames, ...customFieldToolNames].sort();
+export const allToolNames = [...defaultToolNames, ...timeToolNames, ...projectToolNames, ...customFieldToolNames, ...crmToolNames].sort();

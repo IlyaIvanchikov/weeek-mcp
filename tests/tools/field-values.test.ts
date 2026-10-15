@@ -15,18 +15,23 @@ const fields: CustomField[] = [
   field({ name: "Areas", type: "multiselect", options: [review, done] }), field({ name: "Owners", type: "member" }), field({ name: "Sign-off", type: "approval" }),
   field({ name: "Client", type: "contact" }), field({ name: "Mystery", type: null }),
 ];
-const resolver = () => new Resolver({ workspace: { listMembers: async () => stubMembers } } as any, new NameCache(100_000, () => 0));
+const resolver = () => new Resolver({ workspace: { listMembers: async () => stubMembers }, crm: { contacts: { list: async () => ({ contacts: [{ id: "a1f0e7ee-cb63-430e-930f-f1592961439c", name: "Ann Lee" }], hasMore: false }), tryGet: async () => null } } } as any, new NameCache(100_000, () => 0));
 
 describe("encodeFieldValues", () => {
   it("encodes every type by name, resolving options and members", async () => {
     const body = await encodeFieldValues({ resolver: resolver(), fields, values: {
       Link: "https://x.y", Estimate: 5, Urgent: true, Deadline: "2026-08-01T10:00:00Z",
-      Stage: "review", Areas: ["Done", review.id], Owners: ["ilya", ann.id], "Sign-off": ["Ann"], Client: "c1", "id-Notes": null,
+      Stage: "review", Areas: ["Done", review.id], Owners: ["ilya", ann.id], "Sign-off": ["Ann"], Client: "ann lee", "id-Notes": null,
     } });
     expect(body).toEqual({
       "id-Notes": null, "id-Link": "https://x.y", "id-Estimate": 5, "id-Urgent": true, "id-Deadline": "2026-08-01T10:00:00.000Z",
-      "id-Stage": review.id, "id-Areas": [done.id, review.id], "id-Owners": [ilya.id, ann.id], "id-Sign-off": [ann.id], "id-Client": "c1",
+      "id-Stage": review.id, "id-Areas": [done.id, review.id], "id-Owners": [ilya.id, ann.id], "id-Sign-off": [ann.id], "id-Client": "a1f0e7ee-cb63-430e-930f-f1592961439c",
     });
+  });
+
+  it("passes a contact id through unchanged", async () => {
+    const body = await encodeFieldValues({ resolver: resolver(), fields, values: { Client: "a1f0e7ee-cb63-430e-930f-f1592961439c" } });
+    expect(body).toEqual({ "id-Client": "a1f0e7ee-cb63-430e-930f-f1592961439c" });
   });
 
   it("names the field and the shape it takes when the value has the wrong shape", async () => {

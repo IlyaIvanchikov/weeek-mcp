@@ -7,7 +7,7 @@ import { WeeekClient } from "../../src/client.js";
 import { Resolver } from "../../src/resolver.js";
 import { NameCache } from "../../src/cache.js";
 import { listTools } from "../helpers/list-tools.js";
-import { allToolNames, customFieldToolNames, defaultToolNames, projectToolNames, timeToolNames } from "../helpers/tool-names.js";
+import { allToolNames, crmToolNames, customFieldToolNames, defaultToolNames, projectToolNames, timeToolNames } from "../helpers/tool-names.js";
 import { httpConfig } from "../helpers/http.js";
 
 function context(): ToolContext {
@@ -73,5 +73,12 @@ describe("toolsets", () => {
     registerToolsets(ctx, ["custom-fields"]);
     const names = (await listTools(ctx.server)).map((t) => t.name).sort();
     expect(names).toEqual(["weeek_version", ...customFieldToolNames].sort());
+  });
+
+  it("registers only core + crm for the crm toolset", async () => {
+    const ctx = context();
+    registerToolsets(ctx, ["crm"]);
+    const names = (await listTools(ctx.server)).map((t) => t.name).sort();
+    expect(names).toEqual(["weeek_version", ...crmToolNames].sort());
   });
 });
