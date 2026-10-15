@@ -480,4 +480,14 @@ describe("task tools", () => {
     await h.get("weeek_update_task")!({ id: 3, title: "New" });
     expect(getFields).not.toHaveBeenCalled();
   });
+
+  it("create_task names the board-field limitation when a field name is unknown", async () => {
+    const list = vi.fn(async () => []);
+    const create = vi.fn();
+    const h = harness({ ...baseClient, customFields: { list }, tasks: { create } });
+    const res = await h.get("weeek_create_task")!({ title: "x", project: "Marketing", fields: { Lane: "fast" } });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/could not resolve custom field "Lane".*weeek_update_task once the task exists/);
+    expect(create).not.toHaveBeenCalled();
+  });
 });

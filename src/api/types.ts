@@ -1,5 +1,5 @@
 import type { BinaryResponse } from "../http.js";
-import type { attachmentServices, booleanStyles, fieldTypes, numberFormats, optionColors, projectStatuses, taskPriorities, taskTypes } from "./constants.js";
+import type { attachmentServices, booleanStyles, fieldScopes, fieldTypes, numberFormats, optionColors, projectStatuses, taskPriorities, taskTypes, transferTargetKinds } from "./constants.js";
 
 /** What an endpoint answers when it returns no entity, only the success flag. */
 export interface SuccessResponse { success: boolean; }
@@ -69,7 +69,7 @@ export interface WeeekTask {
   locations: TaskLocation[];
   timeEntries: TimeEntry[];
   attachments: Attachment[];
-  customFields: TaskFieldValue[];
+  customFields: CustomFieldValue[];
 }
 
 export interface NewTask {
@@ -79,7 +79,7 @@ export interface NewTask {
   priority?: TaskPriorityCode;
   type?: TaskType;
   parentId?: number;
-  /** Field ids to wire values; built by encodeTaskFields. */
+  /** Field ids to wire values; built by encodeFieldValues. */
   customFields?: Record<string, unknown>;
 }
 
@@ -135,7 +135,7 @@ export type FieldConfig = NumberFieldConfig | BooleanFieldConfig;
 /** What a caller may pass for one field, and what a task shows back: option ids read as option names. null clears. */
 export type FieldValue = string | number | boolean | string[] | null;
 /** A custom field as a task carries it. */
-export interface TaskFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
+export interface CustomFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
 export interface CustomFieldOption { id: string; name: string; color: string; }
 export interface CustomField {
   id: string;
@@ -152,14 +152,13 @@ export interface CustomFieldUpdate { name?: string; config?: FieldConfig; }
 /** PUT on an option replaces both, so an update sends both too. */
 export interface NewFieldOption { name: string; color: OptionColor; }
 
+export type FieldScopeKind = (typeof fieldScopes)[number];
+/** The id each scope kind is addressed by; a kind added to fieldScopes without a row here fails to compile. */
+interface FieldScopeOwners { global: Record<never, never>; project: { projectId: number }; board: { boardId: number }; funnel: { funnelId: string }; }
 /** Where a custom field lives. Each scope has its own routes, so the variant carries the owner's id. */
-export type FieldScope =
-  | { kind: "global" }
-  | { kind: "project"; projectId: number }
-  | { kind: "board"; boardId: number }
-  | { kind: "funnel"; funnelId: string };
+export type FieldScope = { [K in FieldScopeKind]: { kind: K } & FieldScopeOwners[K] }[FieldScopeKind];
 /** Where a global, project or board field can be sent. */
-export type TransferTarget = Exclude<FieldScope, { kind: "funnel" }>;
+export type TransferTarget = Extract<FieldScope, { kind: (typeof transferTargetKinds)[number] }>;
 /** The neighbour a thing is placed next to; the API takes exactly one of the two. */
 export type Placement = { after: string } | { before: string };
 

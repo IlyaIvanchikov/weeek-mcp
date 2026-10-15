@@ -15,3 +15,11 @@ describe("errors", () => {
     expect(e.name).toBe("ResolutionError");
   });
 });
+
+describe("ResolutionError hint", () => {
+  it("appends a hint after the candidates when one is given", () => {
+    const err = new ResolutionError("custom field", "Lane", [], "a board's own fields can be set with weeek_update_task once the task exists");
+    expect(err.message).toBe('could not resolve custom field "Lane"; candidates: none — a board\'s own fields can be set with weeek_update_task once the task exists');
+    expect(err.candidates).toEqual([]);
+  });
+});

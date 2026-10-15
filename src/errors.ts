@@ -24,11 +24,11 @@ export class WeeekTimeoutError extends Error {
 export interface Candidate { id: number | string; name: string; }
 
 export class ResolutionError extends Error {
-  constructor(public kind: string, public query: string, public candidates: Candidate[]) {
+  constructor(public kind: string, public query: string, public candidates: Candidate[], hint?: string) {
     const list = candidates.length
       ? candidates.map((c) => `${c.name} (id ${c.id})`).join(", ")
       : "none";
-    super(`could not resolve ${kind} "${query}"; candidates: ${list}`);
+    super(`could not resolve ${kind} "${query}"; candidates: ${list}${hint === undefined ? "" : ` — ${hint}`}`);
     this.name = "ResolutionError";
   }
 }

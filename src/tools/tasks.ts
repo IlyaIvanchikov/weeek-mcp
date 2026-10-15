@@ -5,13 +5,14 @@ import type { ToolContext } from "../toolsets/types.js";
 import type { CustomField, NewTask, ProjectSummary, WeeekTask } from "../client.js";
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
+import { ResolutionError } from "../errors.js";
 import { parseDay } from "../dates.js";
 import { taskPriorities, taskTypes } from "../api/constants.js";
 import { priorityCode } from "../api/priority.js";
 import { apiFlag } from "../api/requests.js";
 import { destructiveAnnotations } from "./constants.js";
 import { confirmation, dayMonthYear, nameOrId, nameOrIdListCap, page, taskId } from "./inputs.js";
-import { fieldValues, encodeTaskFields } from "./field-values.js";
+import { fieldValues, encodeFieldValues } from "./field-values.js";
 import { registerJsonTool } from "./json-tool.js";
 import { jsonReply, imageReply, errorReply } from "./reply.js";
 
@@ -69,7 +70,14 @@ export async function buildNewTask(resolver: Resolver, input: CreateInput): Prom
       ...(await resolver.list({ kind: "customField" })),
       ...(await resolver.list({ kind: "customField", scope: { fieldScope: { kind: "project", projectId } } })),
     ];
-    newTask.customFields = await encodeTaskFields({ resolver, fields, values: input.fields });
+    try {
+      newTask.customFields = await encodeFieldValues({ resolver, fields, values: input.fields });
+    } catch (err) {
+      if (err instanceof ResolutionError && err.kind === "custom field") {
+        throw new ResolutionError(err.kind, err.query, err.candidates, "a board's own fields can be set with weeek_update_task once the task exists");
+      }
+      throw err;
+    }
   }
   return newTask;
 }
@@ -93,7 +101,7 @@ export async function buildTaskPatch({ resolver, input, taskFields }: BuildTaskP
   if (input.type !== undefined) patch.type = input.type;
   if (input.duration !== undefined) patch.duration = input.duration;
   if (input.tags !== undefined) patch.tags = await Promise.all(input.tags.map((value) => resolver.resolve({ kind: "tag", value })));
-  if (input.fields !== undefined) patch.customFields = await encodeTaskFields({ resolver, fields: taskFields, values: input.fields });
+  if (input.fields !== undefined) patch.customFields = await encodeFieldValues({ resolver, fields: taskFields, values: input.fields });
   return patch;
 }
 

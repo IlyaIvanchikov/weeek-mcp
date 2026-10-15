@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Resolver } from "../../src/resolver.js";
 import { NameCache } from "../../src/cache.js";
-import { encodeTaskFields } from "../../src/tools/field-values.js";
+import { encodeFieldValues } from "../../src/tools/field-values.js";
 import { stubMembers } from "../helpers/tool-harness.js";
 import type { CustomField } from "../../src/client.js";
 
@@ -17,9 +17,9 @@ const fields: CustomField[] = [
 ];
 const resolver = () => new Resolver({ workspace: { listMembers: async () => stubMembers } } as any, new NameCache(100_000, () => 0));
 
-describe("encodeTaskFields", () => {
+describe("encodeFieldValues", () => {
   it("encodes every type by name, resolving options and members", async () => {
-    const body = await encodeTaskFields({ resolver: resolver(), fields, values: {
+    const body = await encodeFieldValues({ resolver: resolver(), fields, values: {
       Link: "https://x.y", Estimate: 5, Urgent: true, Deadline: "2026-08-01T10:00:00Z",
       Stage: "review", Areas: ["Done", review.id], Owners: ["ilya", ann.id], "Sign-off": ["Ann"], Client: "c1", "id-Notes": null,
     } });
@@ -30,16 +30,16 @@ describe("encodeTaskFields", () => {
   });
 
   it("names the field and the shape it takes when the value has the wrong shape", async () => {
-    await expect(encodeTaskFields({ resolver: resolver(), fields, values: { Estimate: "five" } })).rejects.toThrow(/custom field "Estimate" \(number\) takes a number/);
-    await expect(encodeTaskFields({ resolver: resolver(), fields, values: { Areas: "Done" } })).rejects.toThrow(/takes a list of option names or ids/);
+    await expect(encodeFieldValues({ resolver: resolver(), fields, values: { Estimate: "five" } })).rejects.toThrow(/custom field "Estimate" \(number\) takes a number/);
+    await expect(encodeFieldValues({ resolver: resolver(), fields, values: { Areas: "Done" } })).rejects.toThrow(/takes a list of option names or ids/);
   });
 
   it("reports an unknown option or field with candidates, before anything else is encoded", async () => {
-    await expect(encodeTaskFields({ resolver: resolver(), fields, values: { Stage: "Reviw" } })).rejects.toMatchObject({ name: "ResolutionError", candidates: [] });
-    await expect(encodeTaskFields({ resolver: resolver(), fields, values: { Stag: "Review" } })).rejects.toMatchObject({ name: "ResolutionError", candidates: [{ id: "id-Stage", name: "Stage" }] });
+    await expect(encodeFieldValues({ resolver: resolver(), fields, values: { Stage: "Reviw" } })).rejects.toMatchObject({ name: "ResolutionError", candidates: [] });
+    await expect(encodeFieldValues({ resolver: resolver(), fields, values: { Stag: "Review" } })).rejects.toMatchObject({ name: "ResolutionError", candidates: [{ id: "id-Stage", name: "Stage" }] });
   });
 
   it("refuses a field whose type the server does not know", async () => {
-    await expect(encodeTaskFields({ resolver: resolver(), fields, values: { Mystery: "x" } })).rejects.toThrow(/type this server does not know/);
+    await expect(encodeFieldValues({ resolver: resolver(), fields, values: { Mystery: "x" } })).rejects.toThrow(/type this server does not know/);
   });
 });

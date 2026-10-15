@@ -12,10 +12,10 @@ export const fieldValues = z.record(z.string(), fieldValue).describe(
 );
 export type FieldValues = z.infer<typeof fieldValues>;
 
-export interface EncodeTaskFieldsOptions { resolver: Resolver; fields: CustomField[]; values: FieldValues; }
+export interface EncodeFieldValuesOptions { resolver: Resolver; fields: CustomField[]; values: FieldValues; }
 
 /** The `customFields` body: field ids to wire values, each name resolved the way its field's type needs. */
-export async function encodeTaskFields({ resolver, fields, values }: EncodeTaskFieldsOptions): Promise<Record<string, unknown>> {
+export async function encodeFieldValues({ resolver, fields, values }: EncodeFieldValuesOptions): Promise<Record<string, unknown>> {
   const body: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     const field = pickField(fields, key);

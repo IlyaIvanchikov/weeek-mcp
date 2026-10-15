@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { CustomFieldsApi, toCustomField } from "../../src/api/custom-fields.js";
+import { CustomFieldsApi, toCustomField, toFieldValue } from "../../src/api/custom-fields.js";
 import type { CustomField, FieldScope } from "../../src/api/types.js";
 import { jsonFetch, httpWith, sent } from "../helpers/http.js";
 
@@ -170,5 +170,13 @@ describe("CustomFieldsApi writes", () => {
     await api(f).moveOption({ scope: boardScope, fieldId, optionId, placement: { before: otherOptionId } });
     expect(sent(f).url).toBe(`${base}/tm/boards/3/custom-fields/${fieldId}/options/${optionId}/move`);
     expect(sent(f).json()).toEqual({ before: otherOptionId });
+  });
+});
+
+describe("toFieldValue", () => {
+  it("shows option ids as names and keeps primitives", () => {
+    const option = { id: "o1", name: "Review", color: "blue" };
+    expect(toFieldValue({ id: "f1", name: "Stage", type: "select", options: [option], value: "o1" })).toEqual({ id: "f1", name: "Stage", type: "select", value: "Review" });
+    expect(toFieldValue({ id: "f2", name: "Estimate", type: "number", options: [], value: 5 })).toEqual({ id: "f2", name: "Estimate", type: "number", value: 5 });
   });
 });

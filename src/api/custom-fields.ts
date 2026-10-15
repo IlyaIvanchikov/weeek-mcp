@@ -6,7 +6,7 @@ import type { ProjectsApi } from "./projects.js";
 import type { TasksApi } from "./tasks.js";
 import type { FunnelsApi } from "./crm/funnels.js";
 import type {
-  CustomField, CustomFieldOption, CustomFieldUpdate, FieldConfig, FieldScope, NewCustomField, NewFieldOption,
+  CustomField, CustomFieldOption, CustomFieldUpdate, CustomFieldValue, FieldValue, FieldConfig, FieldScope, NewCustomField, NewFieldOption,
   NumberFieldConfig, Placement, SuccessResponse, TransferTarget,
 } from "./types.js";
 
@@ -51,6 +51,25 @@ export function toCustomField(raw: unknown): CustomField {
     // Never pickArray here: a task's field sits beside other arrays, and the fallback would pick one of them.
     options: Array.isArray(r.options) ? r.options.map(toFieldOption) : [],
   };
+}
+
+/** Option ids read as option names; everything else as sent, coerced into the shapes a caller may pass back. */
+export function displayValue(value: unknown, options: CustomFieldOption[]): FieldValue {
+  const named = (item: unknown): string => {
+    const option = options.find((candidate) => candidate.id === item);
+    if (option) return option.name;
+    const r = asRecord(item);
+    return String(r.name ?? r.id ?? item);
+  };
+  if (value == null) return null;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(named);
+  return named(value);
+}
+
+export function toFieldValue(raw: unknown): CustomFieldValue {
+  const field = toCustomField(raw);
+  return { id: field.id, name: field.name, type: field.type, value: displayValue(asRecord(raw).value, field.options) };
 }
 
 // The route members every scope has. The four groups in src/operations.ts share these names on
