@@ -224,4 +224,35 @@ describe("deal tools", () => {
     await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
     expect(c.crm.deals.list).toHaveBeenCalledTimes(2);
   });
+
+  it("weeek_update_deal forgets the cached deal searches even when a link call fails after the PUT", async () => {
+    const { c, h } = harness();
+    c.crm.deals.addTag.mockRejectedValueOnce(new Error("boom"));
+    await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
+    const res = await h.call("weeek_update_deal", { deal: sale.id, title: "Sale 2", tags: ["VIP"] });
+    expect(res.isError).toBe(true);
+    expect(c.crm.deals.replace).toHaveBeenCalledTimes(1);
+    await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
+    expect(c.crm.deals.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("weeek_update_deal adds a link once when the list names it twice", async () => {
+    const { c, h } = harness();
+    await h.call("weeek_update_deal", { deal: sale.id, assignees: ["Ann", ann.id] });
+    expect(c.crm.deals.addAssignee).toHaveBeenCalledTimes(1);
+    expect(c.crm.deals.addAssignee).toHaveBeenCalledWith({ dealId: sale.id, memberId: ann.id });
+  });
+
+  it("weeek_update_deal removes the organization, contact and tag the lists leave out", async () => {
+    const { c, h } = harness();
+    const oldOrganizationId = "00000000-0000-4000-8000-000000000001";
+    const oldContactId = "00000000-0000-4000-8000-000000000002";
+    const oldTagId = 9;
+    const linked = { ...sale, organizations: [oldOrganizationId], contacts: [oldContactId], tags: [oldTagId] } as unknown as typeof sale;
+    c.crm.deals.tryGet.mockImplementation(async (id: string) => (id === sale.id ? linked : null));
+    await h.call("weeek_update_deal", { deal: sale.id, organizations: ["Acme"], contacts: ["Ann Lee"], tags: ["VIP"] });
+    expect(c.crm.deals.removeOrganization).toHaveBeenCalledWith({ dealId: sale.id, organizationId: oldOrganizationId });
+    expect(c.crm.deals.removeContact).toHaveBeenCalledWith({ dealId: sale.id, contactId: oldContactId });
+    expect(c.crm.deals.removeTag).toHaveBeenCalledWith({ dealId: sale.id, tagId: oldTagId });
+  });
 });

@@ -51,7 +51,7 @@ async function syncLinks<Id>({ current, wanted, add, remove }: LinkSync<Id>): Pr
   if (wanted === undefined) return;
   const have = new Set(current);
   const want = new Set(wanted);
-  for (const id of wanted) if (!have.has(id)) await add(id);
+  for (const id of want) if (!have.has(id)) await add(id);
   for (const id of current) if (!want.has(id)) await remove(id);
 }
 
@@ -116,9 +116,13 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
     if (args.outcome !== undefined) replacement.outcome = args.outcome;
     if (args.fields !== undefined) replacement.customFields = await encodeDealFields(resolver, deal.funnelId, args.fields);
     // PUT, not PATCH: PATCH ignores customFields and the lists (FOLLOWUPS 24 f); PUT keeps what it is not sent.
-    if (Object.keys(replacement).length > 0) await client.crm.deals.replace({ dealId: deal.id, replacement });
-    await syncDealLinks(client, deal, links);
-    resolver.forget({ kind: "deal" });
+    try {
+      if (Object.keys(replacement).length > 0) await client.crm.deals.replace({ dealId: deal.id, replacement });
+      await syncDealLinks(client, deal, links);
+    } finally {
+      // A write that failed half-way has still changed the deal, so the cached searches go either way.
+      resolver.forget({ kind: "deal" });
+    }
     return client.crm.deals.get(deal.id);
   });
 
