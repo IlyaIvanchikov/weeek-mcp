@@ -70,4 +70,19 @@ describe("task link tools", () => {
     expect(setParent).toHaveBeenLastCalledWith({ taskId: 80, parentId: null });
     expect(() => h.call("weeek_set_task_parent", { id: 80 })).toThrow(/parent/);
   });
+
+  describe.each([
+    ["weeek_add_task_to_project", { id: 78, project: "Sales" }],
+    ["weeek_remove_task_from_project", { id: 78, project: "Sales", confirm: true }],
+  ] as const)("%s forgets the custom-field lists", (tool, args) => {
+    it("so the next board listing samples the board again", async () => {
+      const list = vi.fn(async () => []);
+      const ok = async () => task;
+      const h = toolHarness(registerTaskLinkTools, { ...client(), customFields: { list }, tasks: { addLocation: ok, removeLocation: ok } });
+      await h.resolver.list({ kind: "customField" });
+      await h.call(tool, args);
+      await h.resolver.list({ kind: "customField" });
+      expect(list).toHaveBeenCalledTimes(2);
+    });
+  });
 });

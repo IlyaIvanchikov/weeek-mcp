@@ -55,3 +55,11 @@ export function toWorkspace(raw: unknown): Workspace {
 export function pageHasMore(count: number, limit: number | undefined): boolean {
   return limit !== undefined && count >= limit;
 }
+
+/**
+ * The entity a write answers with. The spec puts it under its own key (`customField`, `option`);
+ * the board custom-field routes put it under `data` instead (verified 2026-10-15, FOLLOWUPS 23 a).
+ */
+export function pickEntity(obj: Record<string, unknown>, key: string): unknown {
+  return obj[key] ?? obj.data;
+}

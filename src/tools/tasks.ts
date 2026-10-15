@@ -254,7 +254,12 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     description:
       "Create a WEEEK task. Accepts project/column/assignee by NAME or id, a natural-language `due` date, a priority (low, medium, high, hold), a type (action, meet, call), a `parent` task id for a subtask, and custom-field values in `fields` by field name (global and project fields). One call — no need to look up ids first. Omit `assignee` to self-assign; to change assignees later use weeek_add_assignees / weeek_remove_assignees.",
     inputSchema: createShape,
-  }, async (args) => client.tasks.create(await buildNewTask(resolver, args)));
+  }, async (args) => {
+    const task = await client.tasks.create(await buildNewTask(resolver, args));
+    // A board's fields are read off its tasks (CustomFieldsApi.list), so a task that lands on a board changes what the board lists.
+    resolver.forget({ kind: "customField" });
+    return task;
+  });
 
   server.registerTool(
     "weeek_create_tasks",
@@ -275,6 +280,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
           report.push(entry);
         }
       }
+      resolver.forget({ kind: "customField" });
       return jsonReply(report);
     },
   );
@@ -294,7 +300,11 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
       "Permanently delete a WEEEK task by id. Irreversible — the task is removed, not just completed. Requires confirm:true; to merely close a task use weeek_complete_task instead.",
     inputSchema: { id: taskId, confirm: confirmation },
     annotations: destructiveAnnotations,
-  }, async (args) => client.tasks.remove(args.id));
+  }, async (args) => {
+    const removal = await client.tasks.remove(args.id);
+    resolver.forget({ kind: "customField" });
+    return removal;
+  });
 
   registerJsonTool(server, "weeek_attach_file", {
     description:
@@ -312,7 +322,9 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
     inputSchema: { id: taskId, board_id: z.number().int(), column: nameOrId },
   }, async (args) => {
     const columnId = await resolver.resolve({ kind: "column", value: args.column, scope: { boardId: args.board_id } });
-    return client.tasks.move({ taskId: args.id, boardId: args.board_id, boardColumnId: columnId });
+    const task = await client.tasks.move({ taskId: args.id, boardId: args.board_id, boardColumnId: columnId });
+    resolver.forget({ kind: "customField" });
+    return task;
   });
 
   registerJsonTool(server, "weeek_complete_task", {

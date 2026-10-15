@@ -529,4 +529,21 @@ describe("task tools", () => {
     expect(JSON.parse(res.content[0].text).error).toMatch(/could not resolve custom field "Lane".*weeek_update_task once the task exists/);
     expect(create).not.toHaveBeenCalled();
   });
+
+  describe.each([
+    ["weeek_create_task", { title: "x", project: "Marketing" }],
+    ["weeek_create_tasks", { tasks: [{ title: "x", project: "Marketing" }] }],
+    ["weeek_move_task", { id: 7, board_id: 20, column: "In Progress" }],
+    ["weeek_delete_task", { id: 7, confirm: true }],
+  ] as const)("%s forgets the custom-field lists", (tool, args) => {
+    it("so the next board listing samples the board again", async () => {
+      const list = vi.fn(async () => []);
+      const ok = async () => ({ success: true, id: 7 });
+      const h = toolHarness(registerTaskTools, { ...baseClient, customFields: { list }, tasks: { create: ok, move: ok, remove: ok } });
+      await h.resolver.list({ kind: "customField" });
+      await h.call(tool, args);
+      await h.resolver.list({ kind: "customField" });
+      expect(list).toHaveBeenCalledTimes(2);
+    });
+  });
 });
