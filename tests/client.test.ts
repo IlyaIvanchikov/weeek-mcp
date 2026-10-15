@@ -22,6 +22,8 @@ describe("WeeekClient facade", () => {
     expect(typeof c.workspace.listMembers).toBe("function");
     expect(typeof c.customFields.list).toBe("function");
     expect(typeof c.crm.funnels.list).toBe("function");
+    expect(typeof c.crm.statuses.list).toBe("function");
+    expect(typeof c.crm.currencies.list).toBe("function");
   });
 
   it("routes every resource client through the same injected fetch", async () => {

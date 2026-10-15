@@ -21,3 +21,10 @@ export const transferTargetKinds = ["global", "project", "board"] as const;
 export const optionColors = ["blue", "light_blue", "dark_purple", "purple", "dark_pink", "pink", "light_pink", "red", "turquoise", "green", "light_green", "dark_yellow", "yellow"] as const;
 export const numberFormats = ["number", "currency", "percent"] as const;
 export const booleanStyles = ["radio", "checkbox"] as const;
+
+// CRM. Deal outcomes and the sort keys are the spec's enums; the detail vocabulary is ours.
+export const dealOutcomes = ["won", "lost", "archived"] as const;
+export const dealSorts = ["title", "amount", "commented", "createdAt", "updatedAt"] as const;
+export const crmSorts = ["alphabet", "updatedAt"] as const;
+export const detailKinds = ["address", "email", "phone"] as const;
+export const detailOwnerKinds = ["organization", "contact"] as const;
