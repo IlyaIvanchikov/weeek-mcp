@@ -4,7 +4,7 @@ import { operations, listOperations, httpMethods } from "../src/operations.js";
 describe("operation registry", () => {
   it("lists every leaf exactly once", () => {
     const all = listOperations();
-    expect(all.length).toBe(95);
+    expect(all.length).toBe(157);
     const keys = all.map((o) => `${o.method} ${o.path}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
@@ -27,6 +27,11 @@ describe("operation registry", () => {
     expect(operations.boardFields.moveOption.path).toBe("/tm/boards/{boardId}/custom-fields/{fieldId}/options/{optionId}/move");
     expect(operations.funnelFields.move.path).toBe("/crm/funnels/{funnelId}/custom-fields/{fieldId}/move");
     expect(operations.funnels.list.path).toBe("/crm/funnels");
+    expect(operations.statuses.list.path).toBe("/crm/funnels/{funnelId}/statuses");
+    expect(operations.deals.listByStatus.path).toBe("/crm/statuses/{statusId}/deals");
+    expect(operations.deals.moveTask.path).toBe("/crm/deals/{dealId}/tasks/{taskId}/move");
+    expect(operations.organizations.updateAddress.path).toBe("/crm/organizations/{organizationId}/addresses/{addressId}");
+    expect(operations.contacts.removePhone.path).toBe("/crm/contacts/{contactId}/phones/{phoneId}");
     for (const op of listOperations()) {
       for (const param of op.path.match(/\{[^}]+\}/g) ?? []) expect(param).toMatch(/^\{[a-z][A-Za-z]*Id\}$/);
     }
