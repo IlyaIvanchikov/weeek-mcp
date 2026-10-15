@@ -31,6 +31,10 @@ export const crmToolNames = [
   "weeek_list_deals", "weeek_get_deal", "weeek_create_deal", "weeek_update_deal", "weeek_delete_deal", "weeek_move_deal",
   "weeek_add_deal_assignees", "weeek_remove_deal_assignees", "weeek_attach_organization", "weeek_detach_organization",
   "weeek_add_deal_task", "weeek_move_deal_task", "weeek_remove_deal_task", "weeek_attach_deal_file",
+  "weeek_list_organizations", "weeek_get_organization", "weeek_create_organization", "weeek_update_organization", "weeek_delete_organization",
+  "weeek_list_contacts", "weeek_get_contact", "weeek_create_contact", "weeek_update_contact", "weeek_delete_contact",
+  "weeek_attach_contact", "weeek_detach_contact", "weeek_add_crm_tag", "weeek_remove_crm_tag",
+  "weeek_add_detail", "weeek_update_detail", "weeek_delete_detail",
 ].sort();
 
 /** Every tool `WEEEK_TOOLSETS=all` registers. Later toolsets add their list here. */
