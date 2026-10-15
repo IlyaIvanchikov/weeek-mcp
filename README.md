@@ -74,9 +74,10 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `all` | every toolset | |
 
 `weeek_version` is always available. The default is the task surface: 16 528 bytes of
-tool schemas per request; `crm` adds 31 589; `all` is 75 385 bytes. An unknown name is
+tool schemas per request; `crm` alone is 31 589 bytes; `all` is 75 385 bytes. An unknown name is
 rejected at startup with the list of valid ones. With 1.0.0 every operation of WEEEK's public
-API (157) is registered and reachable — the registry is checked against the vendored OpenAPI
+API (157) is registered, and all but one reach a tool (`PUT /crm/deals/{id}`, a subset of the PATCH
+`weeek_update_deal` uses) — the registry is checked against the vendored OpenAPI
 document in both directions on every test run.
 
 Custom-field **values** need no extra toolset: `weeek_get_task` returns them, and
@@ -89,8 +90,8 @@ the API lists them nowhere else, so an empty board shows none.
 The `crm` toolset takes every reference by name: a funnel, a status inside it, a deal by title
 (with its funnel or status) or by id, organizations, contacts by full name, currencies by code,
 tags by title. Deals carry custom-field values like tasks (`fields` by name; on
-`weeek_create_deal` pass `funnel` too). A deal's addresses, emails and phones live on
-organizations and contacts, changed with `weeek_add_detail` / `weeek_update_detail` /
+`weeek_create_deal` pass `funnel` too). Addresses, emails and phones belong to
+organizations and contacts and are changed with `weeek_add_detail` / `weeek_update_detail` /
 `weeek_delete_detail`.
 
 Upgrading from 0.7.0: no tool was renamed or removed; `WEEEK_TOOLSETS=tasks` is still the
@@ -109,7 +110,7 @@ WEEEK_TOOLSETS=all npx -y weeek-mcp-smart         # everything
 
 `spec/weeek-openapi.json` is a snapshot of WEEEK's public OpenAPI document. A test
 (`tests/contract.test.ts`) checks that every operation the server calls exists in it and that
-every operation it declares is either implemented or explicitly deferred — so an API change
+every operation the spec declares is registered — 157 both ways — so an API change
 shows up as a failing test, not as a surprise in production.
 
 It needs Node ≥ 18 (for `fetch`), and `curl` only when `REFRESH_SPEC_INTERFACE` is set.
