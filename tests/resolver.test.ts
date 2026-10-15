@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";
+import { WorkspaceApi } from "../src/api/workspace.js";
+import { httpWith, jsonFetch } from "./helpers/http.js";
 
 function clientWith(over: Record<string, any>) {
   return over as any; // only the resource methods a test needs are provided
@@ -91,6 +93,12 @@ describe("Resolver.resolve", () => {
   it("resolves a member by full name", async () => {
     const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u9", name: "Ilya I" }] } }), freshCache());
     expect(await r.resolve({ kind: "member", value: "ilya i" })).toBe("u9");
+  });
+  it("resolves a member who has a middle name from first and last name", async () => {
+    const member = { id: "u7", firstName: "Ann", middleName: "B", lastName: "Lee" };
+    const workspace = new WorkspaceApi(httpWith(jsonFetch(200, { success: true, members: [member] })));
+    const r = new Resolver(clientWith({ workspace }), freshCache());
+    expect(await r.resolve({ kind: "member", value: "ann lee" })).toBe(member.id);
   });
   it("passes a numeric id through for a scoped kind without needing the scope", async () => {
     const list = vi.fn();

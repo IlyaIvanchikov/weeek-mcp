@@ -65,7 +65,7 @@ describe("fullName and stringList", () => {
     expect(stringList([1, "a"])).toEqual(["1", "a"]);
     expect(stringList("x")).toEqual([]);
   });
-  it("toMember uses the full name", () => {
-    expect(toMember({ id: "u1", firstName: "Ann", middleName: "B", lastName: "Lee" })).toEqual({ id: "u1", name: "Ann B Lee" });
+  it("toMember names a member by first and last name, ignoring a middle name", () => {
+    expect(toMember({ id: "u1", firstName: "Ann", middleName: "B", lastName: "Lee" })).toEqual({ id: "u1", name: "Ann Lee" });
   });
 });

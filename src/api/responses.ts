@@ -18,7 +18,7 @@ export function pickArray(obj: Record<string, unknown>, key: string): unknown[] 
   return [];
 }
 
-/** First, middle and last name joined with single spaces, blanks skipped — how members and contacts are named. */
+/** First, middle and last name joined with single spaces, blanks skipped — how contacts are named. */
 export function fullName(raw: unknown): string {
   const r = asRecord(raw);
   return [r.firstName, r.middleName, r.lastName].filter(Boolean).map(String).join(" ").trim();
@@ -31,7 +31,8 @@ export function stringList(value: unknown): string[] {
 
 export function toMember(raw: unknown): Member {
   const r = asRecord(raw);
-  const name = fullName(r) || r.name || r.email || String(r.id ?? "");
+  // First and last name only, as in 0.7.0: a middle name must not stop "First Last" from resolving a member.
+  const name = [r.firstName, r.lastName].filter(Boolean).map(String).join(" ").trim() || r.name || r.email || String(r.id ?? "");
   return { id: String(r.id ?? ""), name: String(name) };
 }
 
