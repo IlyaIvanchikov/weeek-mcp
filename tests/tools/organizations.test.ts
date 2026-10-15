@@ -36,6 +36,14 @@ describe("organization tools", () => {
     await h.call("weeek_update_organization", { organization: acme.id, name: "Acme 2" });
     expect(c.crm.organizations.update).toHaveBeenLastCalledWith({ organizationId: acme.id, update: { name: "Acme 2", responsibles: [ilya.id] } });
   });
+  it("weeek_update_organization builds the PUT body from a fresh read, not the cached search entry", async () => {
+    const { c, h } = harness();
+    const renamed = { ...acme, name: "Acme (renamed)", responsibleId: ann.id };
+    c.crm.organizations.get.mockResolvedValueOnce(renamed);
+    await h.call("weeek_update_organization", { organization: "Acme" });
+    expect(c.crm.organizations.get).toHaveBeenCalledWith(acme.id);
+    expect(c.crm.organizations.update).toHaveBeenCalledWith({ organizationId: acme.id, update: { name: renamed.name, responsibles: [ann.id] } });
+  });
   it("weeek_delete_organization needs confirm:true and forgets the cached searches", async () => {
     const { c, h } = harness();
     expect(() => h.call("weeek_delete_organization", { organization: acme.id })).toThrow(/confirm/);

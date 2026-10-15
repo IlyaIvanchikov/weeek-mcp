@@ -15,6 +15,11 @@ export interface DealContext { funnelId?: string; statusId?: string; }
 export async function resolveDealContext(resolver: Resolver, { funnel, status }: Pick<DealRefArgs, "funnel" | "status">): Promise<DealContext> {
   const funnelId = funnel === undefined ? undefined : await resolver.resolve({ kind: "funnel", value: funnel });
   const statusId = status === undefined ? undefined : await resolver.resolve({ kind: "status", value: status, scope: { funnelId } });
+  if (funnelId !== undefined && statusId !== undefined) {
+    // A status given by id passes through unchecked; make sure it belongs to the funnel the caller named.
+    const funnelStatuses = await resolver.list({ kind: "status", scope: { funnelId } });
+    if (!funnelStatuses.some((funnelStatus) => funnelStatus.id === statusId)) throw new Error(`status ${status} is not in funnel ${funnel}`);
+  }
   return { funnelId, statusId };
 }
 
@@ -38,8 +43,8 @@ export async function resolveStatus(resolver: Resolver, { status, funnel }: Stat
 /** The thing a shared CRM tool acts on: exactly one of a deal, an organization or a contact. */
 export const crmOwnerShape = {
   deal: nameOrId.optional().describe("A deal, by title (with `funnel` or `status`) or by id."),
-  funnel: nameOrId.optional(),
-  status: nameOrId.optional(),
+  funnel: dealRef.funnel,
+  status: dealRef.status,
   organization: nameOrId.optional().describe("An organization, by name or id."),
   contact: nameOrId.optional().describe("A contact, by full name or id."),
 };

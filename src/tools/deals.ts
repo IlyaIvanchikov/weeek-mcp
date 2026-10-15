@@ -47,7 +47,7 @@ const linkShape = {
 /** Deals: the pipeline's items, always reached through a status or a funnel. */
 export function registerDealTools({ server, client, resolver, attachPolicy }: ToolContext): void {
   registerJsonTool(server, "weeek_list_deals", {
-    description: "List CRM deals in one `status` (by id, or by name with `funnel`) or in every status of a `funnel`: optional `search` text and `sort`. Paged per status; `hasMore` says whether any status has more.",
+    description: "List CRM deals in one `status` (by id, or by name with `funnel`) or in every status of a `funnel`: optional `search` text and `sort`. Paged per status: `limit` and `offset` apply to each status, so a funnel-wide list returns up to `limit` × statuses deals; `hasMore` says whether any status has more.",
     inputSchema: { status: nameOrId.optional(), funnel: nameOrId.optional(), search: z.string().min(1).optional(), sort: z.enum(dealSorts).optional(), ...page },
   }, async (args) => {
     const { funnelId, statusId } = await resolveDealContext(resolver, args);
@@ -120,7 +120,10 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
     const targetFunnelId = args.to_funnel === undefined ? deal.funnelId : await resolver.resolve({ kind: "funnel", value: args.to_funnel });
     const targetStatusId = args.to_status === undefined ? null : await resolver.resolve({ kind: "status", value: args.to_status, scope: { funnelId: targetFunnelId } });
     const searchStatusId = targetStatusId ?? deal.statusId;
-    const previousDealId = args.after === undefined || args.after === null ? null : (await resolver.find({ kind: "deal", value: args.after, scope: { statusId: searchStatusId } })).id;
+    const previousDeal = args.after === undefined || args.after === null ? null : await resolver.find({ kind: "deal", value: args.after, scope: { statusId: searchStatusId } });
+    // An `after` given by id is looked up without the status, so check it sits where the deal is going.
+    if (previousDeal !== null && previousDeal.statusId !== searchStatusId) throw new Error("`after` names a deal in another status");
+    const previousDealId = previousDeal === null ? null : previousDeal.id;
     if (args.to_funnel !== undefined) await client.crm.deals.setFunnel({ dealId: deal.id, funnelId: targetFunnelId });
     if (args.after !== undefined) {
       const placement: DealPlacement = { statusId: targetStatusId, previousDealId };

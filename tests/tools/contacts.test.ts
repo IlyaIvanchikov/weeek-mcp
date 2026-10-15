@@ -3,7 +3,7 @@ import { registerContactTools } from "../../src/tools/contacts.js";
 import { toolHarness, reply } from "../helpers/tool-harness.js";
 
 const organizationId = "a1f0e7ee-c748-4fdc-a197-52699622e4d6";
-const ann = { id: "a1f0e7ee-cb63-430e-930f-f1592961439c", firstName: "Ann", middleName: null, lastName: "Lee", name: "Ann Lee", organizations: [organizationId], emails: [], phones: [{ id: "ph1", value: "+7 911" }], tags: [] };
+const ann = { id: "a1f0e7ee-cb63-430e-930f-f1592961439c", firstName: "Ann", middleName: null as string | null, lastName: "Lee", name: "Ann Lee", organizations: [organizationId], emails: [], phones: [{ id: "ph1", value: "+7 911" }], tags: [] };
 const ok = { success: true };
 const client = () => ({
   tags: { list: vi.fn(async () => [{ id: 5, title: "VIP", color: "#f00" }]) },
@@ -32,6 +32,14 @@ describe("contact tools", () => {
     c.crm.contacts.tryGet.mockResolvedValueOnce(ann);
     await h.call("weeek_update_contact", { contact: ann.id, last_name: "Li" });
     expect(c.crm.contacts.update).toHaveBeenCalledWith({ contactId: ann.id, update: { firstName: "Ann", middleName: null, lastName: "Li" } });
+  });
+  it("weeek_update_contact builds the PUT body from a fresh read, not the cached search entry", async () => {
+    const { c, h } = harness();
+    const renamed = { ...ann, firstName: "Anna", middleName: "B" };
+    c.crm.contacts.get.mockResolvedValueOnce(renamed);
+    await h.call("weeek_update_contact", { contact: "ann lee", last_name: "Li" });
+    expect(c.crm.contacts.get).toHaveBeenCalledWith(ann.id);
+    expect(c.crm.contacts.update).toHaveBeenCalledWith({ contactId: ann.id, update: { firstName: "Anna", middleName: "B", lastName: "Li" } });
   });
   it("weeek_delete_contact needs confirm:true", async () => {
     const { c, h } = harness();

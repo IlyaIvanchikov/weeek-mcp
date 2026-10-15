@@ -120,12 +120,22 @@ describe("deal tools", () => {
 
   it("weeek_move_deal across funnels looks for `after` in the target status and places it there", async () => {
     const { c, h } = harness();
-    c.crm.deals.list.mockImplementation(async () => ({ deals: [sale, other], hasMore: false }));
+    c.crm.deals.list.mockImplementation(async () => ({ deals: [{ ...sale, statusId: statusWork.id }, { ...other, statusId: statusWork.id }], hasMore: false }));
     await h.call("weeek_move_deal", { deal: sale.id, to_funnel: "Sales", to_status: "Work", after: "Other" });
     expect(c.crm.deals.list).toHaveBeenCalledWith(expect.objectContaining({ statusId: statusWork.id }));
     expect(c.crm.deals.setFunnel).toHaveBeenCalledWith({ dealId: sale.id, funnelId });
     expect(c.crm.deals.move).toHaveBeenCalledWith({ dealId: sale.id, placement: { statusId: statusWork.id, previousDealId: other.id } });
     expect(c.crm.deals.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("weeek_move_deal refuses an `after` id whose deal is in another status, and writes nothing", async () => {
+    const { c, h } = harness();
+    const otherInWork = { ...other, statusId: statusWork.id };
+    c.crm.deals.tryGet.mockImplementation(async (id: string) => (id === sale.id ? sale : id === other.id ? otherInWork : null));
+    const res = await h.call("weeek_move_deal", { deal: sale.id, after: other.id });
+    expect(res.isError).toBe(true);
+    expect(reply(res).error).toMatch(/`after` names a deal in another status/);
+    for (const write of [c.crm.deals.setFunnel, c.crm.deals.setStatus, c.crm.deals.move]) expect(write).not.toHaveBeenCalled();
   });
 
   it("weeek_move_deal writes nothing when the `after` deal does not resolve", async () => {

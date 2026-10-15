@@ -35,12 +35,14 @@ export function registerOrganizationTools({ server, client, resolver }: ToolCont
     description: "Rename a CRM organization (by name or id) or change its `responsibles` (members by name or id). Addresses, emails and phones are changed with the detail tools.",
     inputSchema: { organization: nameOrId, name: z.string().min(1).optional(), responsibles: nameOrIdList.optional() },
   }, async (args) => {
-    const currentOrganization = await resolver.find({ kind: "organization", value: args.organization });
+    const organizationId = await resolver.resolve({ kind: "organization", value: args.organization });
+    // Read fresh: a cached search entry can be 60 s old and PUT replaces.
+    const currentOrganization = await client.crm.organizations.get(organizationId);
     // PUT replaces; the detail arrays are omitted on purpose so the API keeps them (FOLLOWUPS 24 c).
     const responsibles = args.responsibles === undefined
       ? (currentOrganization.responsibleId === null ? [] : [currentOrganization.responsibleId])
       : await resolveMembers(resolver, args.responsibles);
-    const organization = await client.crm.organizations.update({ organizationId: currentOrganization.id, update: { name: args.name ?? currentOrganization.name, responsibles } });
+    const organization = await client.crm.organizations.update({ organizationId, update: { name: args.name ?? currentOrganization.name, responsibles } });
     resolver.forget({ kind: "organization" });
     return organization;
   });

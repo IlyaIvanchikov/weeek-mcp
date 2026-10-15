@@ -35,9 +35,11 @@ export function registerContactTools({ server, client, resolver }: ToolContext):
     description: "Change a CRM contact's first, middle or last name (contact by full name or id). Names you omit keep their value; organizations, emails, phones and tags have their own tools.",
     inputSchema: { contact: nameOrId, first_name: nameText.optional(), middle_name: nameText.nullable().optional(), last_name: nameText.nullable().optional() },
   }, async (args) => {
-    const currentContact = await resolver.find({ kind: "contact", value: args.contact });
+    const contactId = await resolver.resolve({ kind: "contact", value: args.contact });
+    // PUT replaces the names, so the base is read fresh: a cached search entry can be 60 s old.
+    const currentContact = await client.crm.contacts.get(contactId);
     const contact = await client.crm.contacts.update({
-      contactId: currentContact.id,
+      contactId,
       update: { firstName: args.first_name ?? currentContact.firstName, middleName: args.middle_name === undefined ? currentContact.middleName : args.middle_name, lastName: args.last_name === undefined ? currentContact.lastName : args.last_name },
     });
     resolver.forget({ kind: "contact" });

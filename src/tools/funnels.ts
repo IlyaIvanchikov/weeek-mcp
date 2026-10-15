@@ -33,10 +33,11 @@ export function registerFunnelTools({ server, client, resolver }: ToolContext): 
     description: "Rename a CRM funnel (by name or id) or change its currency or privacy. Fields you omit keep their current value.",
     inputSchema: { funnel: nameOrId, name: z.string().min(1).optional(), currency: currencyRef, private: z.boolean().optional() },
   }, async (args) => {
-    const currentFunnel = await resolver.find({ kind: "funnel", value: args.funnel });
-    // PUT replaces all three fields, so the current funnel is the base.
+    const funnelId = await resolver.resolve({ kind: "funnel", value: args.funnel });
+    // PUT replaces all three fields, so the base is read fresh: a cached list entry can be 60 s old.
+    const currentFunnel = await client.crm.funnels.get(funnelId);
     const currencyId = args.currency === undefined ? currentFunnel.currencyId : await resolver.resolve({ kind: "currency", value: args.currency });
-    const funnel = await client.crm.funnels.update({ funnelId: currentFunnel.id, update: { name: args.name ?? currentFunnel.name, currencyId, isPrivate: args.private ?? currentFunnel.isPrivate } });
+    const funnel = await client.crm.funnels.update({ funnelId, update: { name: args.name ?? currentFunnel.name, currencyId, isPrivate: args.private ?? currentFunnel.isPrivate } });
     resolver.forget({ kind: "funnel" });
     return funnel;
   });

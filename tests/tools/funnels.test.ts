@@ -41,6 +41,15 @@ describe("funnel, status and currency tools", () => {
     expect(c.crm.funnels.update).toHaveBeenCalledWith({ funnelId, update: { name: "Sales", currencyId: 3, isPrivate: false } });
   });
 
+  it("weeek_update_funnel builds the PUT body from a fresh read, not the cached list entry", async () => {
+    const { c, h } = harness();
+    const renamed = { ...sales, name: "Sales (renamed)", isPrivate: true };
+    c.crm.funnels.get.mockResolvedValueOnce(renamed);
+    await h.call("weeek_update_funnel", { funnel: "Sales", currency: 3 });
+    expect(c.crm.funnels.get).toHaveBeenCalledWith(funnelId);
+    expect(c.crm.funnels.update).toHaveBeenCalledWith({ funnelId, update: { name: renamed.name, currencyId: 3, isPrivate: true } });
+  });
+
   it("weeek_delete_funnel needs confirm:true", async () => {
     const { c, h } = harness();
     expect(() => h.call("weeek_delete_funnel", { funnel: funnelId })).toThrow(/confirm/);
