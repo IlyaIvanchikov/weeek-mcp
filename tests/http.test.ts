@@ -63,6 +63,39 @@ describe("HttpClient.execute", () => {
     await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({ name: "WeeekApiError", status: 404, message: "nope" });
   });
 
+  it("names the field errors of a 422 instead of a bare 'WEEEK API error'", async () => {
+    const f = jsonFetch(422, { success: false, errors: { dueDate: ["The due date field is required when start date is present."], day: ["The day field prohibits start date."] } });
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({
+      name: "WeeekApiError", status: 422,
+      message: "dueDate: The due date field is required when start date is present.; day: The day field prohibits start date.",
+    });
+  });
+
+  it("keeps the API message and appends the field errors when both come", async () => {
+    const f = jsonFetch(422, { success: false, message: "The given data was invalid.", errors: { day: ["The day does not match the format d.m.Y."] } });
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({ message: "The given data was invalid.; day: The day does not match the format d.m.Y." });
+  });
+
+  it("throws on a 200 whose body says success:false, naming the reason", async () => {
+    const f = jsonFetch(200, { success: false, reason: "limit" });
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({ name: "WeeekApiError", status: 200, code: "refused", message: "WEEEK refused the request (reason: limit)" });
+  });
+
+  it("passes a 2xx without a success flag through — a 204-style empty body", async () => {
+    const f = vi.fn(async () => new Response(null, { status: 204 }));
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    expect(await http.execute(op, { params: { taskId: 1 } })).toEqual({});
+  });
+
+  it("falls back to the generic message when the error body is not JSON", async () => {
+    const f = vi.fn(async () => new Response("<html>Server Error</html>", { status: 500, headers: { "content-type": "text/html" } }));
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({ name: "WeeekApiError", status: 500, message: "WEEEK API error" });
+  });
+
   it("maps an aborted request to WeeekTimeoutError", async () => {
     const f = vi.fn((_url: unknown, init: RequestInit) => new Promise<Response>((_, reject) => {
       init.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
