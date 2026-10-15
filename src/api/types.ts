@@ -204,13 +204,13 @@ export interface NewDeal {
   assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
   customFields?: Record<string, unknown>;
 }
-/** PATCH: only the fields given; a list given replaces the deal's. */
+/** PATCH: the spec's body. Live, the API honours only title, amount and outcome and ignores the rest (FOLLOWUPS 24 f); the tool uses PUT. */
 export interface DealPatch {
   title?: string; amount?: number | null; outcome?: DealOutcome | null; description?: string | null;
   assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
   customFields?: Record<string, unknown>;
 }
-/** What PUT /crm/deals/{id} takes — a subset of the patch. */
+/** What PUT /crm/deals/{id} takes; it keeps every field it is not sent, and null clears a custom field (FOLLOWUPS 24 f). */
 export type DealReplacement = Pick<DealPatch, "title" | "amount" | "outcome" | "customFields">;
 export type DealQuery = { search?: string; sort?: DealSort; limit?: number; offset?: number };
 export interface DealPage { deals: Deal[]; hasMore: boolean; }

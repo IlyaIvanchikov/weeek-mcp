@@ -1,7 +1,7 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
 import { apiFlag, attachmentForm, pickAttachments } from "./requests.js";
-import { asRecord, isOneOf, pickArray } from "./responses.js";
+import { asRecord, isOneOf, pickArray, tagIdList } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
 import { toCustomField, toFieldValue } from "./custom-fields.js";
@@ -89,7 +89,7 @@ export function toTask(raw: unknown): WeeekTask {
     completedAt: optionalString(r.completedAt),
     createdAt: optionalString(r.createdAt),
     duration: optionalNumber(r.duration),
-    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    tags: tagIdList(r.tags),
     locations: Array.isArray(r.locations) ? r.locations.map(toLocation) : [],
     timeEntries: Array.isArray(r.timeEntries) ? r.timeEntries.map(toTimeEntry) : [],
     // The API returns these with every task; surfacing them is what lets a caller see a

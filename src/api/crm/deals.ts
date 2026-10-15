@@ -1,6 +1,6 @@
 import type { HttpClient } from "../../http.js";
 import { operations } from "../../operations.js";
-import { asRecord, isOneOf, pickArray, stringList } from "../responses.js";
+import { asRecord, isOneOf, pickArray, stringList, tagIdList } from "../responses.js";
 import { attachmentForm, orNullWhenMissing, pickAttachments } from "../requests.js";
 import { dealOutcomes } from "../constants.js";
 import { toFieldValue } from "../custom-fields.js";
@@ -46,7 +46,7 @@ export function toDeal(raw: unknown): Deal {
     assignees: stringList(r.assignees),
     organizations: stringList(r.organizations),
     contacts: stringList(r.contacts),
-    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    tags: tagIdList(r.tags),
     tasks: Array.isArray(r.tasks) ? r.tasks.map((task) => Number(asRecord(task).id)) : [],
     customFields: Array.isArray(r.customFields) ? r.customFields.map(toFieldValue) : [],
     attachments: Array.isArray(r.attachments) ? (r.attachments as Attachment[]) : [],

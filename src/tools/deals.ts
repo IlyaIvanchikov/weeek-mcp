@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolContext } from "../toolsets/types.js";
 import type { Resolver } from "../resolver.js";
-import type { DealPatch, DealPlacement, NewDeal } from "../client.js";
+import type { Deal, DealPlacement, DealReplacement, NewDeal, WeeekClient } from "../client.js";
 import { dealOutcomes, dealSorts } from "../api/constants.js";
 import { resolveSafeAttachPath } from "../attach.js";
 import { mapWithLimit } from "../concurrency.js";
@@ -19,9 +19,9 @@ const statusListConcurrency = 5;
 
 const outcome = z.enum(dealOutcomes);
 
-/** The deal's links by name, resolved in parallel; a list given replaces the deal's. */
+/** The deal's links by name, resolved in parallel; on create the lists are sent, on update each is synced through the link routes. */
 interface LinkInput { assignees?: Array<string | number>; organizations?: Array<string | number>; contacts?: Array<string | number>; tags?: Array<string | number>; }
-async function resolveLinks(resolver: Resolver, input: LinkInput): Promise<Pick<DealPatch, "assignees" | "organizations" | "contacts" | "tags">> {
+async function resolveLinks(resolver: Resolver, input: LinkInput): Promise<Pick<NewDeal, "assignees" | "organizations" | "contacts" | "tags">> {
   const [assignees, organizations, contacts, tags] = await Promise.all([
     input.assignees === undefined ? undefined : resolveMembers(resolver, input.assignees),
     input.organizations === undefined ? undefined : Promise.all(input.organizations.map((value) => resolver.resolve({ kind: "organization", value }))),
@@ -38,11 +38,31 @@ async function encodeDealFields(resolver: Resolver, funnelId: string, values: Fi
 }
 
 const linkShape = {
-  assignees: nameOrIdList.optional().describe("Members by name or id; replaces the deal's assignees."),
-  organizations: nameOrIdList.optional().describe("Organizations by name or id; replaces the deal's."),
-  contacts: nameOrIdList.optional().describe("Contacts by full name or id; replaces the deal's."),
-  tags: nameOrIdList.optional().describe("Tags by title or id; replaces the deal's."),
+  assignees: nameOrIdList.optional().describe("Members by name or id; replaces the deal's assignees (unlisted ones are removed)."),
+  organizations: nameOrIdList.optional().describe("Organizations by name or id; replaces the deal's (unlisted ones are removed)."),
+  contacts: nameOrIdList.optional().describe("Contacts by full name or id; replaces the deal's (unlisted ones are removed)."),
+  tags: nameOrIdList.optional().describe("Tags by title or id; replaces the deal's (unlisted ones are removed)."),
 };
+
+interface LinkSync<Id> { current: Id[]; wanted: Id[] | undefined; add(id: Id): Promise<unknown>; remove(id: Id): Promise<unknown>; }
+
+/** One list of a deal brought to `wanted` with the add/remove routes — PATCH ignores the lists (FOLLOWUPS 24 f). Undefined means "leave it". */
+async function syncLinks<Id>({ current, wanted, add, remove }: LinkSync<Id>): Promise<void> {
+  if (wanted === undefined) return;
+  const have = new Set(current);
+  const want = new Set(wanted);
+  for (const id of wanted) if (!have.has(id)) await add(id);
+  for (const id of current) if (!want.has(id)) await remove(id);
+}
+
+/** The deal's four lists brought to what the caller gave, each through its own routes. */
+async function syncDealLinks(client: WeeekClient, deal: Deal, links: Pick<NewDeal, "assignees" | "organizations" | "contacts" | "tags">): Promise<void> {
+  const dealId = deal.id;
+  await syncLinks({ current: deal.assignees, wanted: links.assignees, add: (memberId) => client.crm.deals.addAssignee({ dealId, memberId }), remove: (memberId) => client.crm.deals.removeAssignee({ dealId, memberId }) });
+  await syncLinks({ current: deal.organizations, wanted: links.organizations, add: (organizationId) => client.crm.deals.addOrganization({ dealId, organizationId }), remove: (organizationId) => client.crm.deals.removeOrganization({ dealId, organizationId }) });
+  await syncLinks({ current: deal.contacts, wanted: links.contacts, add: (contactId) => client.crm.deals.addContact({ dealId, contactId }), remove: (contactId) => client.crm.deals.removeContact({ dealId, contactId }) });
+  await syncLinks({ current: deal.tags, wanted: links.tags, add: (tagId) => client.crm.deals.addTag({ dealId, tagId }), remove: (tagId) => client.crm.deals.removeTag({ dealId, tagId }) });
+}
 
 /** Deals: the pipeline's items, always reached through a status or a funnel. */
 export function registerDealTools({ server, client, resolver, attachPolicy }: ToolContext): void {
@@ -84,19 +104,22 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
   });
 
   registerJsonTool(server, "weeek_update_deal", {
-    description: "Change a CRM deal (by id, or by title with `funnel`/`status`): title, amount (null clears), outcome (won, lost, archived; null reopens), description, and the assignees, organizations, contacts, tags (each list replaces) and custom-field `fields` by name. Fields you omit keep their value.",
-    inputSchema: { ...dealRef, title: z.string().min(1).optional(), amount: z.number().nullable().optional(), outcome: outcome.nullable().optional(), description: z.string().nullable().optional(), ...linkShape, fields: fieldValues.optional() },
+    description: "Change a CRM deal (by id, or by title with `funnel`/`status`): title, amount (null clears), outcome (won, lost, archived; null reopens), custom-field `fields` by name (null clears), and the assignees, organizations, contacts and tags (each list replaces: unlisted ones are removed). Fields you omit keep their value. The description can only be set on create — the API ignores it afterwards.",
+    inputSchema: { ...dealRef, title: z.string().min(1).optional(), amount: z.number().nullable().optional(), outcome: outcome.nullable().optional(), ...linkShape, fields: fieldValues.optional() },
   }, async (args) => {
     const deal = await findDeal(resolver, args);
-    const patch: DealPatch = { ...(await resolveLinks(resolver, args)) };
-    if (args.title !== undefined) patch.title = args.title;
-    if (args.amount !== undefined) patch.amount = args.amount;
-    if (args.outcome !== undefined) patch.outcome = args.outcome;
-    if (args.description !== undefined) patch.description = args.description;
-    if (args.fields !== undefined) patch.customFields = await encodeDealFields(resolver, deal.funnelId, args.fields);
-    const updated = await client.crm.deals.update({ dealId: deal.id, patch });
+    // Resolve every name first: a bad one must not leave the deal half-changed.
+    const links = await resolveLinks(resolver, args);
+    const replacement: DealReplacement = {};
+    if (args.title !== undefined) replacement.title = args.title;
+    if (args.amount !== undefined) replacement.amount = args.amount;
+    if (args.outcome !== undefined) replacement.outcome = args.outcome;
+    if (args.fields !== undefined) replacement.customFields = await encodeDealFields(resolver, deal.funnelId, args.fields);
+    // PUT, not PATCH: PATCH ignores customFields and the lists (FOLLOWUPS 24 f); PUT keeps what it is not sent.
+    if (Object.keys(replacement).length > 0) await client.crm.deals.replace({ dealId: deal.id, replacement });
+    await syncDealLinks(client, deal, links);
     resolver.forget({ kind: "deal" });
-    return updated;
+    return client.crm.deals.get(deal.id);
   });
 
   registerJsonTool(server, "weeek_delete_deal", {
