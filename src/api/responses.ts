@@ -49,3 +49,8 @@ export function toWorkspace(raw: unknown): Workspace {
   const r = asRecord(raw);
   return { id: Number(r.id), title: String(r.title ?? ""), description: r.description == null ? null : String(r.description), isPersonal: Boolean(r.isPersonal) };
 }
+
+/** The API sends no "more" flag for organizations and contacts: a full page, when one was asked for, means there may be more. */
+export function pageHasMore(count: number, limit: number | undefined): boolean {
+  return limit !== undefined && count >= limit;
+}
