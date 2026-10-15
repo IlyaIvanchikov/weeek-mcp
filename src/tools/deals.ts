@@ -68,12 +68,16 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
     description: "Create a CRM deal in a `status` (by id, or by name with `funnel`): `title`, optional amount, outcome (won, lost, archived), description, assignees, organizations, contacts and tags by name, and custom-field `fields` by name (fields need `funnel`).",
     inputSchema: { status: nameOrId, funnel: nameOrId.optional(), title: z.string().min(1), amount: z.number().optional(), outcome: outcome.optional(), description: z.string().optional(), ...linkShape, fields: fieldValues.optional() },
   }, async (args) => {
-    if (args.fields !== undefined && args.funnel === undefined) throw new Error("fields on a new deal need `funnel` (name or id) to resolve the field names");
-    const { funnelId, statusId } = await resolveDealContext(resolver, args);
-    if (statusId === undefined) throw new Error("a new deal needs a status");
+    const funnelId = args.funnel === undefined ? undefined : await resolver.resolve({ kind: "funnel", value: args.funnel });
+    let customFields: Record<string, unknown> | undefined;
+    if (args.fields !== undefined) {
+      if (funnelId === undefined) throw new Error("fields on a new deal need `funnel` (name or id) to resolve the field names");
+      customFields = await encodeDealFields(resolver, funnelId, args.fields);
+    }
+    const statusId = await resolver.resolve({ kind: "status", value: args.status, scope: { funnelId } });
     const links = await resolveLinks(resolver, args);
     const deal: NewDeal = { title: args.title, amount: args.amount, outcome: args.outcome, description: args.description, ...links };
-    if (args.fields !== undefined && funnelId !== undefined) deal.customFields = await encodeDealFields(resolver, funnelId, args.fields);
+    if (customFields !== undefined) deal.customFields = customFields;
     const created = await client.crm.deals.create({ statusId, deal });
     resolver.forget({ kind: "deal" });
     return created;
@@ -106,21 +110,23 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
   });
 
   registerJsonTool(server, "weeek_move_deal", {
-    description: "Move a CRM deal: `to_funnel` (another funnel), `to_status` (a status of its funnel, or of `to_funnel`), and/or `after` — the deal it goes right after in that status (null = first). Pass at least one.",
+    description: "Move a CRM deal: `to_funnel` (another funnel), `to_status` (a status of its funnel, or of `to_funnel`), and/or `after` — the deal it goes right after in that status (null = first). Pass at least one; `after` with `to_funnel` needs `to_status`.",
     inputSchema: { ...dealRef, to_funnel: nameOrId.optional(), to_status: nameOrId.optional(), after: nameOrId.nullable().optional() },
   }, async (args) => {
     if (args.to_funnel === undefined && args.to_status === undefined && args.after === undefined) throw new Error("pass to_funnel, to_status or after");
+    if (args.to_funnel !== undefined && args.after !== undefined && args.to_status === undefined) throw new Error("placing a deal with `after` in another funnel needs `to_status`");
     const deal = await findDeal(resolver, args);
+    // Resolve every id first: a bad name must not leave the deal half-moved.
     const targetFunnelId = args.to_funnel === undefined ? deal.funnelId : await resolver.resolve({ kind: "funnel", value: args.to_funnel });
     const targetStatusId = args.to_status === undefined ? null : await resolver.resolve({ kind: "status", value: args.to_status, scope: { funnelId: targetFunnelId } });
+    const searchStatusId = targetStatusId ?? deal.statusId;
+    const previousDealId = args.after === undefined || args.after === null ? null : (await resolver.find({ kind: "deal", value: args.after, scope: { statusId: searchStatusId } })).id;
     if (args.to_funnel !== undefined) await client.crm.deals.setFunnel({ dealId: deal.id, funnelId: targetFunnelId });
-    if (args.after === undefined) {
-      if (targetStatusId !== null) await client.crm.deals.setStatus({ dealId: deal.id, statusId: targetStatusId });
-    } else {
-      const statusId = targetStatusId ?? deal.statusId;
-      const previousDealId = args.after === null ? null : (await resolver.find({ kind: "deal", value: args.after, scope: { statusId } })).id;
+    if (args.after !== undefined) {
       const placement: DealPlacement = { statusId: targetStatusId, previousDealId };
       await client.crm.deals.move({ dealId: deal.id, placement });
+    } else if (targetStatusId !== null) {
+      await client.crm.deals.setStatus({ dealId: deal.id, statusId: targetStatusId });
     }
     resolver.forget({ kind: "deal" });
     return client.crm.deals.get(deal.id);

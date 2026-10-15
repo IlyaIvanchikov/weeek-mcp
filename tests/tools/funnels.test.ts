@@ -9,6 +9,7 @@ const fresh = { id: statusId, name: "New", dealsCount: 0, dealsAmount: 0 };
 const usd = { id: 2, name: "US Dollar", code: "USD", symbol: "$" };
 const ok = { success: true };
 const client = () => ({
+  customFields: { list: vi.fn(async () => []) },
   crm: {
     funnels: { list: vi.fn(async () => [sales]), get: vi.fn(async () => sales), create: vi.fn(async () => sales), update: vi.fn(async () => sales), remove: vi.fn(async () => ok) },
     statuses: { list: vi.fn(async (_fid: string) => [fresh]), get: vi.fn(async () => fresh), tryGet: vi.fn(async (id: string) => (id === statusId ? fresh : null)), create: vi.fn(async () => fresh), update: vi.fn(async () => fresh), remove: vi.fn(async () => ok) },
@@ -45,6 +46,15 @@ describe("funnel, status and currency tools", () => {
     expect(() => h.call("weeek_delete_funnel", { funnel: funnelId })).toThrow(/confirm/);
     await h.call("weeek_delete_funnel", { funnel: funnelId, confirm: true });
     expect(c.crm.funnels.remove).toHaveBeenCalledWith(funnelId);
+  });
+
+  it("weeek_delete_funnel forgets the funnel's cached custom fields", async () => {
+    const { c, h } = harness();
+    const fieldScope = { kind: "funnel", funnelId } as const;
+    await h.resolver.list({ kind: "customField", scope: { fieldScope } });
+    await h.call("weeek_delete_funnel", { funnel: funnelId, confirm: true });
+    await h.resolver.list({ kind: "customField", scope: { fieldScope } });
+    expect(c.customFields.list).toHaveBeenCalledTimes(2);
   });
 
   it("status tools take a status id alone, or a name with its funnel", async () => {

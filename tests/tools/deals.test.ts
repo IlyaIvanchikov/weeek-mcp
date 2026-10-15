@@ -96,14 +96,44 @@ describe("deal tools", () => {
     const { c, h } = harness();
     await h.call("weeek_move_deal", { deal: sale.id, to_status: "Work" });
     expect(c.crm.deals.setStatus).toHaveBeenCalledWith({ dealId: sale.id, statusId: statusWork.id });
+    expect(c.crm.deals.move).not.toHaveBeenCalled();
+    expect(c.crm.deals.setFunnel).not.toHaveBeenCalled();
     await h.call("weeek_move_deal", { deal: sale.id, to_funnel: "Sales" });
     expect(c.crm.deals.setFunnel).toHaveBeenCalledWith({ dealId: sale.id, funnelId });
     await h.call("weeek_move_deal", { deal: sale.id, to_status: "Work", after: null });
     expect(c.crm.deals.move).toHaveBeenCalledWith({ dealId: sale.id, placement: { statusId: statusWork.id, previousDealId: null } });
     await h.call("weeek_move_deal", { deal: sale.id, after: "Other" });
     expect(c.crm.deals.move).toHaveBeenLastCalledWith({ dealId: sale.id, placement: { statusId: null, previousDealId: other.id } });
+    expect(c.crm.deals.setStatus).toHaveBeenCalledTimes(1);
+    expect(c.crm.deals.setFunnel).toHaveBeenCalledTimes(1);
     const res = await h.call("weeek_move_deal", { deal: sale.id });
     expect(reply(res).error).toMatch(/pass to_funnel, to_status or after/);
+  });
+
+  it("weeek_move_deal with to_funnel and after needs to_status, and writes nothing without it", async () => {
+    const { c, h } = harness();
+    const res = await h.call("weeek_move_deal", { deal: sale.id, to_funnel: "Sales", after: "Other" });
+    expect(res.isError).toBe(true);
+    expect(reply(res).error).toMatch(/needs `to_status`/);
+    for (const write of [c.crm.deals.setFunnel, c.crm.deals.setStatus, c.crm.deals.move, c.crm.deals.list]) expect(write).not.toHaveBeenCalled();
+  });
+
+  it("weeek_move_deal across funnels looks for `after` in the target status and places it there", async () => {
+    const { c, h } = harness();
+    c.crm.deals.list.mockImplementation(async () => ({ deals: [sale, other], hasMore: false }));
+    await h.call("weeek_move_deal", { deal: sale.id, to_funnel: "Sales", to_status: "Work", after: "Other" });
+    expect(c.crm.deals.list).toHaveBeenCalledWith(expect.objectContaining({ statusId: statusWork.id }));
+    expect(c.crm.deals.setFunnel).toHaveBeenCalledWith({ dealId: sale.id, funnelId });
+    expect(c.crm.deals.move).toHaveBeenCalledWith({ dealId: sale.id, placement: { statusId: statusWork.id, previousDealId: other.id } });
+    expect(c.crm.deals.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("weeek_move_deal writes nothing when the `after` deal does not resolve", async () => {
+    const { c, h } = harness();
+    const res = await h.call("weeek_move_deal", { deal: sale.id, to_funnel: "Sales", to_status: "Work", after: "Nope" });
+    expect(res.isError).toBe(true);
+    expect(reply(res).candidates).toBeDefined();
+    for (const write of [c.crm.deals.setFunnel, c.crm.deals.setStatus, c.crm.deals.move]) expect(write).not.toHaveBeenCalled();
   });
 
   it("assignee and organization links resolve names, call once per member, and re-read the deal", async () => {

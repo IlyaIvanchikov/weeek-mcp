@@ -51,6 +51,7 @@ export function registerFunnelTools({ server, client, resolver }: ToolContext): 
     resolver.forget({ kind: "funnel" });
     resolver.forget({ kind: "status", scope: { funnelId } });
     resolver.forget({ kind: "deal" });
+    resolver.forget({ kind: "customField" });
     return removal;
   });
 
