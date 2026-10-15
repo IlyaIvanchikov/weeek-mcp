@@ -6,7 +6,8 @@ import type { CustomField, NewTask, ProjectSummary, WeeekTask } from "../client.
 import type { Resolver } from "../resolver.js";
 import { resolveSafeAttachPath } from "../attach.js";
 import { ResolutionError } from "../errors.js";
-import { parseDay } from "../dates.js";
+import { formatDayMonthYear, parseDay } from "../dates.js";
+import type { TaskWithFields } from "../api/tasks.js";
 import { taskPriorities, taskTypes } from "../api/constants.js";
 import { priorityCode } from "../api/priority.js";
 import { apiFlag } from "../api/requests.js";
@@ -59,7 +60,7 @@ export async function buildNewTask(resolver: Resolver, input: CreateInput): Prom
   const newTask: NewTask = { title: input.title, projectId };
   if (input.column !== undefined) newTask.boardColumnId = await resolver.resolve({ kind: "column", value: input.column, scope: { projectId } });
   if (input.assignee !== undefined) newTask.userId = await resolver.resolve({ kind: "member", value: input.assignee });
-  if (input.due !== undefined) newTask.dayFrom = parseDay(input.due);
+  if (input.due !== undefined) newTask.day = formatDayMonthYear(parseDay(input.due));
   if (input.description !== undefined) newTask.description = input.description;
   if (input.priority !== undefined) newTask.priority = priorityCode(input.priority);
   if (input.type !== undefined) newTask.type = input.type;
@@ -85,23 +86,37 @@ export async function buildNewTask(resolver: Resolver, input: CreateInput): Prom
 export interface BuildTaskPatchOptions {
   resolver: Resolver;
   input: UpdateInput;
-  /** The task's own fields — what `fields` names are resolved against; [] when none are given. */
-  taskFields: CustomField[];
+  /** The task as read for this update; needed when `fields` names fields or `start` comes without `due`, null otherwise. */
+  current: TaskWithFields | null;
+}
+
+/** The task read for this update; the handler reads it only when a parameter needs it. */
+function requireCurrent(current: TaskWithFields | null, parameter: string): TaskWithFields {
+  if (current === null) throw new Error(`buildTaskPatch needs the task when \`${parameter}\` is given`);
+  return current;
+}
+
+/** The due date a start date travels with: the API refuses a start date sent alone (FOLLOWUPS 21 b). */
+function dueDateOf({ task }: TaskWithFields): string {
+  if (task.dueDate === null) throw new Error("`start` needs a due date: pass `due` too — the task has none");
+  return task.dueDate;
 }
 
 /** The PUT body for weeek_update_task: only the fields given, names resolved to ids. */
-export async function buildTaskPatch({ resolver, input, taskFields }: BuildTaskPatchOptions): Promise<Record<string, unknown>> {
+export async function buildTaskPatch({ resolver, input, current }: BuildTaskPatchOptions): Promise<Record<string, unknown>> {
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
-  // `dayFrom` has set the due date since 0.1 although the spec names the field `dueDate`;
-  // the Phase 2 live smoke settles which one the API honours (FOLLOWUPS).
-  if (input.due !== undefined) patch.dayFrom = parseDay(input.due);
-  if (input.start !== undefined) patch.startDate = parseDay(input.start);
+  // PUT /tm/tasks/{id} takes `dueDate` and `startDate` in Y-m-d; `dayFrom`, sent until 1.0.0, was ignored (FOLLOWUPS 21 b).
+  if (input.due !== undefined) patch.dueDate = parseDay(input.due);
+  if (input.start !== undefined) {
+    patch.startDate = parseDay(input.start);
+    if (input.due === undefined) patch.dueDate = dueDateOf(requireCurrent(current, "start"));
+  }
   if (input.priority !== undefined) patch.priority = priorityCode(input.priority);
   if (input.type !== undefined) patch.type = input.type;
   if (input.duration !== undefined) patch.duration = input.duration;
   if (input.tags !== undefined) patch.tags = await Promise.all(input.tags.map((value) => resolver.resolve({ kind: "tag", value })));
-  if (input.fields !== undefined) patch.customFields = await encodeFieldValues({ resolver, fields: taskFields, values: input.fields });
+  if (input.fields !== undefined) patch.customFields = await encodeFieldValues({ resolver, fields: requireCurrent(current, "fields").fields, values: input.fields });
   return patch;
 }
 
@@ -266,11 +281,12 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
 
   registerJsonTool(server, "weeek_update_task", {
     description:
-      "Update a WEEEK task: title, natural-language `due` and `start` dates, priority (low, medium, high, hold), type (action, meet, call), `duration` estimate in minutes, `tags` by name or id (replaces the task's tags; an empty list clears them), and `fields`: custom-field values by field name (select options and members by name too; null clears; other fields keep their values). NOTE: description is NOT updatable — WEEEK's API silently ignores it on update; set it at create time or in the UI. Assignees, watchers, parent and projects have their own tools.",
+      "Update a WEEEK task: title, natural-language `due` and `start` dates (`start` goes with the due date — `due` or the task's own — because the API refuses one alone; some plans refuse start dates), priority (low, medium, high, hold), type (action, meet, call), `duration` in minutes, `tags` by name or id (replaces; an empty list clears), and `fields`: custom-field values by field name (options and members by name; null clears; other fields keep their values). Description is NOT updatable — the API ignores it; set it on create. Assignees, watchers, parent and projects have their own tools.",
     inputSchema: updateShape,
   }, async (args) => {
-    const taskFields = args.fields === undefined ? [] : await client.tasks.getFields(args.id);
-    return client.tasks.update(args.id, await buildTaskPatch({ resolver, input: args, taskFields }));
+    const isTaskNeeded = args.fields !== undefined || (args.start !== undefined && args.due === undefined);
+    const current = isTaskNeeded ? await client.tasks.getWithFields(args.id) : null;
+    return client.tasks.update(args.id, await buildTaskPatch({ resolver, input: args, current }));
   });
 
   registerJsonTool(server, "weeek_delete_task", {

@@ -377,11 +377,50 @@ describe("task tools", () => {
     expect(create).toHaveBeenCalledWith({ title: "Sub", projectId: 1, priority: 3, type: "meet", parentId: 70 });
   });
 
+  it("create_task sends the due date as `day` in d.m.Y, the format POST /tm/tasks honours", async () => {
+    const create = vi.fn(async (b: any) => ({ id: 5, ...b }));
+    const h = harness({ ...baseClient, tasks: { create } });
+    await h.get("weeek_create_task")!({ title: "x", project: "Marketing", due: "2026-11-20" });
+    expect(create).toHaveBeenCalledWith({ title: "x", projectId: 1, day: "20.11.2026" });
+  });
+
+  const dueTask = { task: { id: 3, dueDate: "2026-08-10" }, fields: [] };
+
   it("update_task resolves tags by name and sends the new fields only when given", async () => {
     const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
-    const h = harness({ ...baseClient, tags: { list: async () => [{ id: 5, title: "Urgent", color: "#f00" }] }, tasks: { update } });
-    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", 6], priority: "high", type: "call", duration: 90, start: "2026-08-01" });
-    expect(update).toHaveBeenCalledWith(3, { tags: [5, 6], priority: 2, type: "call", duration: 90, startDate: "2026-08-01" });
+    const getWithFields = vi.fn(async (_id: number) => dueTask);
+    const h = harness({ ...baseClient, tags: { list: async () => [{ id: 5, title: "Urgent", color: "#f00" }] }, tasks: { update, getWithFields } });
+    await h.get("weeek_update_task")!({ id: 3, tags: ["urgent", 6], priority: "high", type: "call", duration: 90, due: "2026-08-01" });
+    expect(update).toHaveBeenCalledWith(3, { tags: [5, 6], priority: 2, type: "call", duration: 90, dueDate: "2026-08-01" });
+    expect(getWithFields).not.toHaveBeenCalled();
+  });
+
+  it("update_task sends start and due together as startDate and dueDate", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const getWithFields = vi.fn(async (_id: number) => dueTask);
+    const h = harness({ ...baseClient, tasks: { update, getWithFields } });
+    await h.get("weeek_update_task")!({ id: 3, start: "2026-08-01", due: "2026-08-05" });
+    expect(update).toHaveBeenCalledWith(3, { startDate: "2026-08-01", dueDate: "2026-08-05" });
+    expect(getWithFields).not.toHaveBeenCalled();
+  });
+
+  it("update_task start alone reads the task and sends its due date along, as the API demands", async () => {
+    const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
+    const getWithFields = vi.fn(async (_id: number) => dueTask);
+    const h = harness({ ...baseClient, tasks: { update, getWithFields } });
+    await h.get("weeek_update_task")!({ id: 3, start: "2026-08-01" });
+    expect(getWithFields).toHaveBeenCalledWith(3);
+    expect(update).toHaveBeenCalledWith(3, { startDate: "2026-08-01", dueDate: dueTask.task.dueDate });
+  });
+
+  it("update_task start on a task without a due date fails before any PUT", async () => {
+    const update = vi.fn();
+    const getWithFields = vi.fn(async (_id: number) => ({ task: { id: 3, dueDate: null }, fields: [] }));
+    const h = harness({ ...baseClient, tasks: { update, getWithFields } });
+    const res = await h.get("weeek_update_task")!({ id: 3, start: "2026-08-01" });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toMatch(/`start` needs a due date/);
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("weeek_list_boards resolves the project by name", async () => {
@@ -454,31 +493,31 @@ describe("task tools", () => {
 
   it("update_task reads the task's own fields, then sends customFields", async () => {
     const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }] };
-    const getFields = vi.fn(async (_id: number) => [stage]);
+    const getWithFields = vi.fn(async (_id: number) => ({ task: { id: 3, dueDate: null }, fields: [stage] }));
     const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
-    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    const h = harness({ ...baseClient, tasks: { getWithFields, update } });
     await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Review" }, title: "New" });
-    expect(getFields).toHaveBeenCalledWith(3);
+    expect(getWithFields).toHaveBeenCalledWith(3);
     expect(update).toHaveBeenCalledWith(3, { title: "New", customFields: { [stage.id]: "o1" } });
   });
 
   it("update_task refuses a misspelt option with candidates and never updates", async () => {
     const stage = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", config: null, options: [{ id: "o1", name: "Review", color: "blue" }, { id: "o2", name: "Done", color: "green" }] };
-    const getFields = vi.fn(async (_id: number) => [stage]);
+    const getWithFields = vi.fn(async (_id: number) => ({ task: { id: 3, dueDate: null }, fields: [stage] }));
     const update = vi.fn();
-    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    const h = harness({ ...baseClient, tasks: { getWithFields, update } });
     const res = await h.get("weeek_update_task")!({ id: 3, fields: { Stage: "Reviw" } });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text)).toHaveProperty("candidates");
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("update_task does not read the task when no fields are given", async () => {
-    const getFields = vi.fn();
+  it("update_task does not read the task when neither fields nor a lone start is given", async () => {
+    const getWithFields = vi.fn();
     const update = vi.fn(async (id: number, patch: any) => ({ id, ...patch }));
-    const h = harness({ ...baseClient, tasks: { getFields, update } });
+    const h = harness({ ...baseClient, tasks: { getWithFields, update } });
     await h.get("weeek_update_task")!({ id: 3, title: "New" });
-    expect(getFields).not.toHaveBeenCalled();
+    expect(getWithFields).not.toHaveBeenCalled();
   });
 
   it("create_task names the board-field limitation when a field name is unknown", async () => {

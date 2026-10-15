@@ -74,7 +74,9 @@ export interface WeeekTask {
 
 export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
-  description?: string; userId?: string; dayFrom?: string;
+  description?: string; userId?: string;
+  /** The due date in `d.m.Y`, the one format the create route honours; `dayFrom` was ignored (FOLLOWUPS 21 b). */
+  day?: string;
   /** Wire code; use priorityCode() to build it from a name. */
   priority?: TaskPriorityCode;
   type?: TaskType;
