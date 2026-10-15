@@ -74,7 +74,7 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `all` | every toolset | |
 
 `weeek_version` is always available. The default is the task surface: 16 528 bytes of
-tool schemas per request; `crm` alone is 31 589 bytes; `all` is 75 385 bytes. An unknown name is
+tool schemas per request; `crm` alone is 32 076 bytes; `all` is 75 872 bytes. An unknown name is
 rejected at startup with the list of valid ones. With 1.0.0 every operation of WEEEK's public
 API (157) is registered, and all but one reach a tool (`PUT /crm/deals/{id}`, a subset of the PATCH
 `weeek_update_deal` uses) — the registry is checked against the vendored OpenAPI
