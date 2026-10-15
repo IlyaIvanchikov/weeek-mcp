@@ -14,7 +14,7 @@ weeek_create_task({ title: "Ship v1", project: "Marketing",
                     fields: { "Estimate": 5 } })
 ```
 
-Then `weeek_add_comment`, `weeek_add_assignees`, `weeek_set_task_parent` — all by name, all one call, custom fields included.
+Then `weeek_add_comment`, `weeek_add_assignees`, `weeek_set_task_parent` — all by name, all one call, custom fields included — and the CRM: `weeek_create_deal({ status: "New", funnel: "Sales", title: "Big one", contacts: ["Ann Lee"] })`.
 
 No `list_projects → list_boards → list_columns → list_members` dance first.
 
@@ -57,7 +57,7 @@ This server is driven by an LLM that can read untrusted content (task text, web 
 - **`weeek_attach_file`** only reads files inside an allowed directory (its subfolders included). By default that's the server's **working directory** — so it works with no setup for local files, while paths outside it (`/etc/passwd`, `~/.ssh`, `..` traversal, symlinks that escape) are refused. Set `WEEEK_ATTACH_DIR` to point the jail somewhere specific or lock it down further. No special folder is required.
 - **`weeek_delete_task`** is permanent and requires an explicit `confirm: true`; to merely close a task use `weeek_complete_task`.
 - **`weeek_get_attachment`** returns the image for an attachment WEEEK hosts itself, so a task specified in screenshots can be read rather than guessed at. It downloads bytes only when the attachment's `service` is `weeek`; an attachment parked in Google Drive/Dropbox/OneDrive/Box comes back as metadata with its URL instead. The download sends **no token at all**: WEEEK hands out a pre-signed one-hour URL that redirects to its storage bucket, and the server follows exactly one redirect, only to `https`, with no credentials on either hop. Non-images return metadata only, and anything over `WEEEK_ATTACH_MAX_BYTES` is refused rather than truncated.
-- **Every tool that deletes, archives or detaches** — a project, board, column, tag, portfolio, comment, time entry, custom field or field option; an assignee or watcher; a task's membership of a project — requires `confirm: true` and is marked destructive in its annotations, so a client can ask before running it.
+- **Every tool that deletes, archives or detaches** — a project, board, column, tag, portfolio, comment, time entry, custom field or field option; a funnel, status, deal, organization or contact, a contact's or organization's address, email or phone; an assignee, watcher, contact, organization or tag link; a task's membership of a project — requires `confirm: true` and is marked destructive in its annotations, so a client can ask before running it.
 
 ## Toolsets
 
@@ -70,11 +70,14 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `time` | `weeek_set_timer`, `weeek_add_time_entry`, `weeek_update_time_entry`, `weeek_delete_time_entry` | |
 | `projects` | `weeek_get_project`, `weeek_create_project`, `weeek_update_project`, `weeek_archive_project`, `weeek_delete_project`, `weeek_create_board`, `weeek_update_board`, `weeek_delete_board`, `weeek_move_board`, `weeek_create_column`, `weeek_update_column`, `weeek_delete_column`, `weeek_move_column`, `weeek_list_portfolios`, `weeek_get_portfolio`, `weeek_create_portfolio`, `weeek_update_portfolio`, `weeek_delete_portfolio`, `weeek_list_tags`, `weeek_get_tag`, `weeek_create_tag`, `weeek_update_tag`, `weeek_delete_tag`, `weeek_get_workspace`, `weeek_get_profile` | |
 | `custom-fields` | `weeek_list_custom_fields`, `weeek_create_custom_field`, `weeek_update_custom_field`, `weeek_delete_custom_field`, `weeek_transfer_custom_field`, `weeek_move_custom_field`, `weeek_add_field_option`, `weeek_update_field_option`, `weeek_delete_field_option`, `weeek_move_field_option` | |
+| `crm` | `weeek_list_funnels`, `weeek_get_funnel`, `weeek_create_funnel`, `weeek_update_funnel`, `weeek_delete_funnel`, `weeek_list_statuses`, `weeek_get_status`, `weeek_create_status`, `weeek_update_status`, `weeek_delete_status`, `weeek_list_currencies`, `weeek_list_deals`, `weeek_get_deal`, `weeek_create_deal`, `weeek_update_deal`, `weeek_delete_deal`, `weeek_move_deal`, `weeek_add_deal_assignees`, `weeek_remove_deal_assignees`, `weeek_attach_organization`, `weeek_detach_organization`, `weeek_add_deal_task`, `weeek_move_deal_task`, `weeek_remove_deal_task`, `weeek_attach_deal_file`, `weeek_list_organizations`, `weeek_get_organization`, `weeek_create_organization`, `weeek_update_organization`, `weeek_delete_organization`, `weeek_list_contacts`, `weeek_get_contact`, `weeek_create_contact`, `weeek_update_contact`, `weeek_delete_contact`, `weeek_attach_contact`, `weeek_detach_contact`, `weeek_add_crm_tag`, `weeek_remove_crm_tag`, `weeek_add_detail`, `weeek_update_detail`, `weeek_delete_detail` | |
 | `all` | every toolset | |
 
-`weeek_version` is always available. The default is the task surface: 16 504 bytes of
-tool schemas per request; `all` is 44 042 bytes. `crm` (1.0.0) arrives in the next release;
-an unknown name is rejected at startup with the list of valid ones.
+`weeek_version` is always available. The default is the task surface: 16 528 bytes of
+tool schemas per request; `crm` adds 31 589; `all` is 75 385 bytes. An unknown name is
+rejected at startup with the list of valid ones. With 1.0.0 every operation of WEEEK's public
+API (157) is registered and reachable — the registry is checked against the vendored OpenAPI
+document in both directions on every test run.
 
 Custom-field **values** need no extra toolset: `weeek_get_task` returns them, and
 `weeek_create_task` / `weeek_update_task` take `fields: { "Estimate": 5, "Stage": "Review" }` by
@@ -83,14 +86,21 @@ field name (on create, global and project fields; a board's own fields once the 
 global scope, a project, a board or a CRM funnel. A board's fields are read off its tasks because
 the API lists them nowhere else, so an empty board shows none.
 
-Upgrading from 0.6.0: no tool was renamed or removed; `WEEEK_TOOLSETS=tasks` is still the
-default. Opt in with `custom-fields` or `all`.
+The `crm` toolset takes every reference by name: a funnel, a status inside it, a deal by title
+(with its funnel or status) or by id, organizations, contacts by full name, currencies by code,
+tags by title. Deals carry custom-field values like tasks (`fields` by name; on
+`weeek_create_deal` pass `funnel` too). A deal's addresses, emails and phones live on
+organizations and contacts, changed with `weeek_add_detail` / `weeek_update_detail` /
+`weeek_delete_detail`.
+
+Upgrading from 0.7.0: no tool was renamed or removed; `WEEEK_TOOLSETS=tasks` is still the
+default. Opt in with `crm` or `all`.
 
 Upgrading from 0.5.0: the default toolset grew from 12 tools to 24 in 0.6.0 (plus `weeek_version`), and `WEEEK_TOOLSETS=tasks` is still the default, so nothing else changes unless you opt in to `time`, `projects` or `all`.
 
 ```bash
-WEEEK_TOOLSETS=tasks,custom-fields npx -y weeek-mcp-smart   # add field administration
-WEEEK_TOOLSETS=all npx -y weeek-mcp-smart                   # everything
+WEEEK_TOOLSETS=tasks,crm npx -y weeek-mcp-smart   # add the CRM
+WEEEK_TOOLSETS=all npx -y weeek-mcp-smart         # everything
 ```
 
 ## Development
