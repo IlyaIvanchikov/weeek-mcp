@@ -26,18 +26,18 @@ describe("OrganizationsApi", () => {
     expect(sent(f).url).toBe(`${base}/${organizationId}`);
     expect(await api(jsonFetch(404, { message: "not found" })).tryGet(organizationId)).toBeNull();
   });
-  it("create POSTs the fields given", async () => {
+  it("create POSTs the fields given, the responsible as responsibleId", async () => {
     const f = jsonFetch(200, { success: true, organization: rawOrganization });
-    expect(await api(f).create({ name: "Acme", emails: ["kot@gmail.com"], responsibles: ["u1"] })).toEqual(organization);
+    expect(await api(f).create({ name: "Acme", emails: ["kot@gmail.com"], responsibleId: "u1" })).toEqual(organization);
     expect(sent(f).init.method).toBe("POST");
-    expect(sent(f).json()).toEqual({ name: "Acme", emails: ["kot@gmail.com"], responsibles: ["u1"] });
+    expect(sent(f).json()).toEqual({ name: "Acme", emails: ["kot@gmail.com"], responsibleId: "u1" });
   });
-  it("update PUTs name and responsibles only", async () => {
+  it("update PUTs name and responsibleId only — the detail arrays are kept by the API when omitted", async () => {
     const f = jsonFetch(200, { success: true, organization: rawOrganization });
-    expect(await api(f).update({ organizationId, update: { name: "Acme 2", responsibles: [] } })).toEqual(organization);
+    expect(await api(f).update({ organizationId, update: { name: "Acme 2", responsibleId: null } })).toEqual(organization);
     expect(sent(f).init.method).toBe("PUT");
     expect(sent(f).url).toBe(`${base}/${organizationId}`);
-    expect(sent(f).json()).toEqual({ name: "Acme 2", responsibles: [] });
+    expect(sent(f).json()).toEqual({ name: "Acme 2", responsibleId: null });
   });
   it("remove DELETEs the organization", async () => {
     const f = jsonFetch(200, { success: true });

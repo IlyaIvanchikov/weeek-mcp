@@ -227,9 +227,10 @@ export interface Organization {
   contacts: string[];
   tags: number[];
 }
-export interface NewOrganization { name: string; addresses?: string[]; emails?: string[]; phones?: string[]; responsibles?: string[]; }
-/** PUT /crm/organizations/{id} sends name and responsibles only; the detail arrays are omitted so the API keeps them (FOLLOWUPS 24 c). */
-export interface OrganizationUpdate { name: string; responsibles: string[]; }
+/** `responsibleId` is the key the API honours; the spec's plural members list is ignored (verified 2026-10-15, FOLLOWUPS 24 h). */
+export interface NewOrganization { name: string; addresses?: string[]; emails?: string[]; phones?: string[]; responsibleId?: string; }
+/** PUT /crm/organizations/{id} sends name and responsibleId only; the detail arrays are omitted so the API keeps them (FOLLOWUPS 24 c). null clears the responsible. */
+export interface OrganizationUpdate { name: string; responsibleId: string | null; }
 export type CrmQuery = { search?: string; sort?: CrmSort; limit?: number; offset?: number };
 export interface OrganizationPage { organizations: Organization[]; hasMore: boolean; }
 export interface Contact {
