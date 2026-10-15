@@ -18,10 +18,21 @@ export function pickArray(obj: Record<string, unknown>, key: string): unknown[] 
   return [];
 }
 
+/** First, middle and last name joined with single spaces, blanks skipped — how contacts are named. */
+export function fullName(raw: unknown): string {
+  const r = asRecord(raw);
+  return [r.firstName, r.middleName, r.lastName].filter(Boolean).map(String).join(" ").trim();
+}
+
+/** A wire list as strings; anything that is not a list is empty. */
+export function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
 export function toMember(raw: unknown): Member {
   const r = asRecord(raw);
-  const joined = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
-  const name = joined || r.name || r.email || String(r.id ?? "");
+  // First and last name only, as in 0.7.0: a middle name must not stop "First Last" from resolving a member.
+  const name = [r.firstName, r.lastName].filter(Boolean).map(String).join(" ").trim() || r.name || r.email || String(r.id ?? "");
   return { id: String(r.id ?? ""), name: String(name) };
 }
 
@@ -38,4 +49,9 @@ export function toProfile(raw: unknown): Profile {
 export function toWorkspace(raw: unknown): Workspace {
   const r = asRecord(raw);
   return { id: Number(r.id), title: String(r.title ?? ""), description: r.description == null ? null : String(r.description), isPersonal: Boolean(r.isPersonal) };
+}
+
+/** The API sends no "more" flag for organizations and contacts: a full page, when one was asked for, means there may be more. */
+export function pageHasMore(count: number, limit: number | undefined): boolean {
+  return limit !== undefined && count >= limit;
 }

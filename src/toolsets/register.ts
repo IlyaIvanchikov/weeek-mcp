@@ -6,6 +6,11 @@ import { registerTimeTools } from "../tools/time.js";
 import { registerProjectTools } from "../tools/projects.js";
 import { registerWorkspaceTools } from "../tools/workspace.js";
 import { registerCustomFieldTools } from "../tools/custom-fields.js";
+import { registerFunnelTools } from "../tools/funnels.js";
+import { registerDealTools } from "../tools/deals.js";
+import { registerOrganizationTools } from "../tools/organizations.js";
+import { registerContactTools } from "../tools/contacts.js";
+import { registerCrmLinkTools } from "../tools/crm-links.js";
 import type { ToolContext, ToolsetName } from "./types.js";
 
 type RealToolset = Exclude<ToolsetName, "all">;
@@ -22,6 +27,13 @@ const registrars: Record<RealToolset, (ctx: ToolContext) => void> = {
     registerWorkspaceTools(ctx);
   },
   "custom-fields": registerCustomFieldTools,
+  crm: (ctx) => {
+    registerFunnelTools(ctx);
+    registerDealTools(ctx);
+    registerOrganizationTools(ctx);
+    registerContactTools(ctx);
+    registerCrmLinkTools(ctx);
+  },
 };
 
 export function expandToolsets(selected: readonly ToolsetName[]): RealToolset[] {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { asRecord, isOneOf, pickArray, toMember, toProfile, toWorkspace } from "../../src/api/responses.js";
+import { asRecord, fullName, isOneOf, pickArray, stringList, toMember, toProfile, toWorkspace } from "../../src/api/responses.js";
 
 describe("pickArray", () => {
   it("returns the array under the expected key", () => {
@@ -52,5 +52,20 @@ describe("isOneOf", () => {
 describe("toWorkspace", () => {
   it("normalises the workspace and nulls a missing description", () => {
     expect(toWorkspace({ id: "3", title: "Acme", isPersonal: 1 })).toEqual({ id: 3, title: "Acme", description: null, isPersonal: true });
+  });
+});
+
+describe("fullName and stringList", () => {
+  it("joins first, middle and last names, skipping blanks", () => {
+    expect(fullName({ firstName: "Ann", middleName: null, lastName: "Lee" })).toBe("Ann Lee");
+    expect(fullName({ firstName: "Ann", middleName: "B", lastName: "Lee" })).toBe("Ann B Lee");
+    expect(fullName({})).toBe("");
+  });
+  it("coerces a list to strings and anything else to []", () => {
+    expect(stringList([1, "a"])).toEqual(["1", "a"]);
+    expect(stringList("x")).toEqual([]);
+  });
+  it("toMember names a member by first and last name, ignoring a middle name", () => {
+    expect(toMember({ id: "u1", firstName: "Ann", middleName: "B", lastName: "Lee" })).toEqual({ id: "u1", name: "Ann Lee" });
   });
 });

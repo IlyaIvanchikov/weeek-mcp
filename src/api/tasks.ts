@@ -1,11 +1,11 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
-import { apiFlag } from "./requests.js";
+import { apiFlag, attachmentForm, pickAttachments } from "./requests.js";
 import { asRecord, isOneOf, pickArray } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
-import { toCustomField } from "./custom-fields.js";
-import type { Attachment, BoardFieldSample, CommentsPage, CustomField, CustomFieldOption, FieldValue, NewTask, SuccessResponse, TaskComment, TaskFieldValue, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
+import { toCustomField, toFieldValue } from "./custom-fields.js";
+import type { Attachment, BoardFieldSample, CommentsPage, CustomField, NewTask, SuccessResponse, TaskComment, TaskLocation, TimeEntry, TimeEntryFields, WeeekTask } from "./types.js";
 
 export interface SetCompletedOptions { taskId: number; completed: boolean; }
 export interface MoveTaskOptions { taskId: number; boardId: number; boardColumnId: number; }
@@ -64,26 +64,7 @@ function fieldsOf(rawTask: unknown): CustomField[] {
   return Array.isArray(fields) ? fields.map(toCustomField) : [];
 }
 
-/** Option ids read as option names; everything else as sent, coerced into the shapes a caller may pass back. */
-function displayValue(value: unknown, options: CustomFieldOption[]): FieldValue {
-  const named = (item: unknown): string => {
-    const option = options.find((candidate) => candidate.id === item);
-    if (option) return option.name;
-    const r = asRecord(item);
-    return String(r.name ?? r.id ?? item);
-  };
-  if (value == null) return null;
-  if (typeof value === "number" || typeof value === "boolean") return value;
-  if (Array.isArray(value)) return value.map(named);
-  return named(value);
-}
-
-function toFieldValue(raw: unknown): TaskFieldValue {
-  const field = toCustomField(raw);
-  return { id: field.id, name: field.name, type: field.type, value: displayValue(asRecord(raw).value, field.options) };
-}
-
-function toTask(raw: unknown): WeeekTask {
+export function toTask(raw: unknown): WeeekTask {
   const r = asRecord(raw);
   return {
     id: Number(r.id),
@@ -194,14 +175,8 @@ export class TasksApi {
   }
 
   async uploadAttachment({ taskId, filename, bytes }: UploadAttachmentOptions): Promise<Attachment[]> {
-    const form = new FormData();
-    const blob = bytes instanceof Blob ? bytes : new Blob([bytes as BlobPart]);
-    form.append("files[]", blob, filename);
-    const json = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId }, body: form });
-    // The spec documents `data` as one Attachment; accept a list too — `files[]` is a
-    // multipart array and the live shape has not been pinned down (FOLLOWUPS #18).
-    if (Array.isArray(json.data)) return json.data as Attachment[];
-    return json.data ? [json.data as Attachment] : [];
+    const json = await this.http.execute<{ data?: unknown }>(ops.uploadAttachment, { params: { taskId }, body: attachmentForm({ filename, bytes }) });
+    return pickAttachments(json);
   }
 
   async listComments({ taskId, limit, offset }: ListCommentsOptions): Promise<CommentsPage> {

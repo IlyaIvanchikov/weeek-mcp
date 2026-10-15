@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { Resolver } from "../src/resolver.js";
 import { NameCache } from "../src/cache.js";
+import { WorkspaceApi } from "../src/api/workspace.js";
+import { httpWith, jsonFetch } from "./helpers/http.js";
 
 function clientWith(over: Record<string, any>) {
   return over as any; // only the resource methods a test needs are provided
@@ -91,6 +93,12 @@ describe("Resolver.resolve", () => {
   it("resolves a member by full name", async () => {
     const r = new Resolver(clientWith({ workspace: { listMembers: async () => [{ id: "u9", name: "Ilya I" }] } }), freshCache());
     expect(await r.resolve({ kind: "member", value: "ilya i" })).toBe("u9");
+  });
+  it("resolves a member who has a middle name from first and last name", async () => {
+    const member = { id: "u7", firstName: "Ann", middleName: "B", lastName: "Lee" };
+    const workspace = new WorkspaceApi(httpWith(jsonFetch(200, { success: true, members: [member] })));
+    const r = new Resolver(clientWith({ workspace }), freshCache());
+    expect(await r.resolve({ kind: "member", value: "ann lee" })).toBe(member.id);
   });
   it("passes a numeric id through for a scoped kind without needing the scope", async () => {
     const list = vi.fn();
@@ -232,5 +240,95 @@ describe("Resolver.resolve", () => {
     r.forget({ kind: "board", scope: { projectId: 1 } });
     await r.resolve({ kind: "column", value: "Done", scope: { boardId: 10 } });
     expect(columnsList).toHaveBeenCalledTimes(2);
+  });
+
+  const funnelId = "OLY24hy2mC7n9D9l";
+  const statusNew = { id: "XliVA5F0gguLo4Pw", name: "New", dealsCount: 1, dealsAmount: 0 };
+  const statusWork = { id: "31bGWcEZ99LZLHqE", name: "Work", dealsCount: 1, dealsAmount: 0 };
+  const dealOf = (id: string, statusId: string, title: string) => ({ id, title, statusId, funnelId, description: null, amount: null, outcome: null, assignees: [], organizations: [], contacts: [], tags: [], tasks: [], customFields: [], attachments: [], createdAt: null, updatedAt: null });
+  const sale = dealOf("EcwB3DpREwmffxSP", statusNew.id, "Sale");
+  const crmClient = (over: Record<string, unknown> = {}) => clientWith({
+    crm: {
+      statuses: { list: vi.fn(async (_fid: string) => [statusNew, statusWork]), tryGet: vi.fn(async () => null) },
+      deals: { list: vi.fn(async ({ statusId }: { statusId: string }) => ({ deals: statusId === statusNew.id ? [sale] : [], hasMore: false })), tryGet: vi.fn(async () => null) },
+      organizations: { list: vi.fn(async () => ({ organizations: [{ id: "a1f0e7ee-c748-4fdc-a197-52699622e4d6", name: "Acme" }], hasMore: false })), tryGet: vi.fn(async () => null) },
+      contacts: { list: vi.fn(async () => ({ contacts: [{ id: "a1f0e7ee-cb63-430e-930f-f1592961439c", name: "Ann Lee" }], hasMore: false })), tryGet: vi.fn(async () => null) },
+      currencies: { list: vi.fn(async () => [{ id: 2, name: "US Dollar", code: "USD", symbol: "$" }]) },
+      ...over,
+    },
+  });
+
+  it("resolves a status by name inside its funnel, by id with no funnel, and refuses a name without one", async () => {
+    const client = crmClient({ statuses: { list: vi.fn(async (_fid: string) => [statusNew, statusWork]), tryGet: vi.fn(async (id: string) => (id === statusWork.id ? statusWork : null)) } });
+    const r = new Resolver(client, freshCache());
+    expect(await r.resolve({ kind: "status", value: "work", scope: { funnelId } })).toBe(statusWork.id);
+    expect(client.crm.statuses.list).toHaveBeenCalledWith(funnelId);
+    expect(await r.resolve({ kind: "status", value: statusWork.id })).toBe(statusWork.id);
+    expect(client.crm.statuses.tryGet).toHaveBeenCalledWith(statusWork.id);
+    await expect(r.resolve({ kind: "status", value: "Work" })).rejects.toThrow(/resolving a status by name needs a funnel \(name or id\)/);
+  });
+
+  it("resolves a deal by its 16-character id with no context, through one GET", async () => {
+    const client = crmClient({ deals: { list: vi.fn(), tryGet: vi.fn(async () => sale) } });
+    const r = new Resolver(client, freshCache());
+    expect(await r.resolve({ kind: "deal", value: sale.id })).toBe(sale.id);
+    expect(client.crm.deals.tryGet).toHaveBeenCalledWith(sale.id);
+    expect(client.crm.deals.list).not.toHaveBeenCalled();
+    expect(client.crm.statuses.list).not.toHaveBeenCalled();
+  });
+
+  it("resolves a deal by title inside a status with one search, and inside a funnel with one search per status", async () => {
+    const client = crmClient();
+    const r = new Resolver(client, freshCache());
+    expect(await r.resolve({ kind: "deal", value: "sale", scope: { statusId: statusNew.id } })).toBe(sale.id);
+    expect(client.crm.deals.list).toHaveBeenCalledTimes(1);
+    expect(client.crm.deals.list).toHaveBeenCalledWith({ statusId: statusNew.id, query: { search: "sale", limit: 50 } });
+    expect(await r.resolve({ kind: "deal", value: "sale", scope: { funnelId } })).toBe(sale.id);
+    expect(client.crm.deals.list).toHaveBeenCalledTimes(3);
+  });
+
+  it("refuses a deal title without a funnel or a status, and a title that only looks like an id falls through to the search", async () => {
+    const client = crmClient();
+    const r = new Resolver(client, freshCache());
+    await expect(r.resolve({ kind: "deal", value: "Sale" })).rejects.toThrow(/resolving a deal by name needs a funnel or a status \(name or id\)/);
+    const lookalike = dealOf("qkLffuJ4sQ1I8W7b", statusNew.id, "ProjectAlpha2026");
+    client.crm.deals.list.mockResolvedValue({ deals: [lookalike], hasMore: false });
+    expect(await r.resolve({ kind: "deal", value: "ProjectAlpha2026", scope: { statusId: statusNew.id } })).toBe(lookalike.id);
+    expect(client.crm.deals.tryGet).toHaveBeenCalledWith("ProjectAlpha2026");
+  });
+
+  it("reports a deal title found in two statuses as ambiguous, with both as candidates", async () => {
+    const twin = dealOf("R2jv7XSbDCHFFyl1", statusWork.id, "Sale");
+    const client = crmClient({ deals: { list: vi.fn(async ({ statusId }: { statusId: string }) => ({ deals: [statusId === statusNew.id ? sale : twin], hasMore: false })), tryGet: vi.fn(async () => null) } });
+    const r = new Resolver(client, freshCache());
+    await expect(r.resolve({ kind: "deal", value: "Sale", scope: { funnelId } })).rejects.toMatchObject({ name: "ResolutionError", candidates: [{ id: sale.id, name: "Sale" }, { id: twin.id, name: "Sale" }] });
+  });
+
+  it("forgetting a deal drops every status's and funnel's deal searches", async () => {
+    const client = crmClient();
+    const r = new Resolver(client, freshCache());
+    await r.resolve({ kind: "deal", value: "sale", scope: { statusId: statusNew.id } });
+    r.forget({ kind: "deal" });
+    await r.resolve({ kind: "deal", value: "sale", scope: { statusId: statusNew.id } });
+    expect(client.crm.deals.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes an organization UUID through on resolve, fetches it on find, and searches a name", async () => {
+    const acme = { id: "a1f0e7ee-c748-4fdc-a197-52699622e4d6", name: "Acme" };
+    const client = crmClient({ organizations: { list: vi.fn(async () => ({ organizations: [acme], hasMore: false })), tryGet: vi.fn(async () => acme) } });
+    const r = new Resolver(client, freshCache());
+    expect(await r.resolve({ kind: "organization", value: acme.id })).toBe(acme.id);
+    expect(client.crm.organizations.tryGet).not.toHaveBeenCalled();
+    expect(await r.find({ kind: "organization", value: acme.id })).toEqual(acme);
+    expect(client.crm.organizations.tryGet).toHaveBeenCalledWith(acme.id);
+    expect(await r.resolve({ kind: "organization", value: "acme" })).toBe(acme.id);
+    expect(client.crm.organizations.list).toHaveBeenCalledWith({ search: "acme", limit: 50 });
+  });
+
+  it("resolves a contact by full name and a currency by code", async () => {
+    const r = new Resolver(crmClient(), freshCache());
+    expect(await r.resolve({ kind: "contact", value: "ann lee" })).toBe("a1f0e7ee-cb63-430e-930f-f1592961439c");
+    expect(await r.resolve({ kind: "currency", value: "usd" })).toBe(2);
+    expect(await r.resolve({ kind: "currency", value: 3 })).toBe(3);
   });
 });

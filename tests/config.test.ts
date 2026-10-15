@@ -29,12 +29,12 @@ describe("WEEEK_TOOLSETS", () => {
     expect(parseToolsets(" tasks , ALL,,tasks")).toEqual(["tasks", "all"]);
   });
   it("rejects an unknown toolset and names the valid ones", () => {
-    expect(() => loadConfig({ WEEEK_TOOLSETS: "tasks,crm" })).toThrow(new RegExp(`WEEEK_TOOLSETS.*"crm".*${toolsetNames.join(", ")}`));
+    expect(() => loadConfig({ WEEEK_TOOLSETS: "tasks,analytics" })).toThrow(new RegExp(`WEEEK_TOOLSETS.*"analytics".*${toolsetNames.join(", ")}`));
   });
   it("validates each name once and keeps the parsed names typed", () => {
     expect(parseToolsets("Tasks, tasks ,TIME")).toEqual(["tasks", "time"]);
     expect(toolsetNames.every(isToolsetName)).toBe(true);
-    expect(isToolsetName("crm")).toBe(false);
+    expect(isToolsetName("analytics")).toBe(false);
     expect(isToolsetName("Tasks")).toBe(false);
   });
 });

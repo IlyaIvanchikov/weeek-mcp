@@ -1,15 +1,16 @@
 {
   "name": "weeek-mcp-smart",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "mcpName": "io.github.IlyaIvanchikov/weeek-mcp-smart",
-  "description": "WEEEK tasks by name, not IDs — an MCP server",
+  "description": "WEEEK tasks and CRM by name, not IDs — an MCP server covering the whole public API",
   "keywords": [
     "mcp",
     "model-context-protocol",
     "weeek",
     "claude",
     "task-tracker",
-    "productivity"
+    "productivity",
+    "crm"
   ],
   "license": "MIT",
   "author": "Ilya Ivanchikov <ilyaivanchikov96@mail.ru> (https://www.linkedin.com/in/ilyaivanchikov)",

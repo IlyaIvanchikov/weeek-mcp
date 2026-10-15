@@ -8,14 +8,14 @@ import { pickField, pickOption } from "./field-refs.js";
 /** What a caller may pass for one field; null clears it. */
 export const fieldValue = z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]);
 export const fieldValues = z.record(z.string(), fieldValue).describe(
-  "Custom-field values by field name or id. text/link: a string; number: a number; boolean: true/false; datetime: a natural-language date or time; select: an option name; multiselect: option names; member/approval: member names; contact: a contact id; null clears the field.",
+  "Custom-field values by field name or id. text/link: a string; number: a number; boolean: true/false; datetime: a natural-language date or time; select: an option name; multiselect: option names; member/approval: member names; contact: a contact name or id; null clears the field.",
 );
 export type FieldValues = z.infer<typeof fieldValues>;
 
-export interface EncodeTaskFieldsOptions { resolver: Resolver; fields: CustomField[]; values: FieldValues; }
+export interface EncodeFieldValuesOptions { resolver: Resolver; fields: CustomField[]; values: FieldValues; }
 
 /** The `customFields` body: field ids to wire values, each name resolved the way its field's type needs. */
-export async function encodeTaskFields({ resolver, fields, values }: EncodeTaskFieldsOptions): Promise<Record<string, unknown>> {
+export async function encodeFieldValues({ resolver, fields, values }: EncodeFieldValuesOptions): Promise<Record<string, unknown>> {
   const body: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     const field = pickField(fields, key);
@@ -51,7 +51,7 @@ async function encodeFieldValue(resolver: Resolver, field: CustomField, value: G
     case "select": return pickOption(field, wantString(field, value, "one option name or id")).id;
     case "multiselect": return wantList(field, value, "a list of option names or ids").map((item) => pickOption(field, item).id);
     case "member": case "approval": return resolveMembers(resolver, wantList(field, value, "a list of member names or ids"));
-    case "contact": return wantString(field, value, "a contact id");
+    case "contact": return resolver.resolve({ kind: "contact", value: wantString(field, value, "a contact name or id") });
     case null: throw new Error(`custom field "${field.name}" has a type this server does not know; set it in WEEEK`);
     default: { const _exhaustive: never = field.type; throw new Error(`unhandled field type ${String(_exhaustive)}`); }
   }

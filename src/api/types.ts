@@ -1,5 +1,5 @@
 import type { BinaryResponse } from "../http.js";
-import type { attachmentServices, booleanStyles, fieldTypes, numberFormats, optionColors, projectStatuses, taskPriorities, taskTypes } from "./constants.js";
+import type { attachmentServices, booleanStyles, crmSorts, dealOutcomes, dealSorts, detailKinds, detailOwnerKinds, fieldScopes, fieldTypes, numberFormats, optionColors, projectStatuses, taskPriorities, taskTypes, transferTargetKinds } from "./constants.js";
 
 /** What an endpoint answers when it returns no entity, only the success flag. */
 export interface SuccessResponse { success: boolean; }
@@ -69,7 +69,7 @@ export interface WeeekTask {
   locations: TaskLocation[];
   timeEntries: TimeEntry[];
   attachments: Attachment[];
-  customFields: TaskFieldValue[];
+  customFields: CustomFieldValue[];
 }
 
 export interface NewTask {
@@ -79,7 +79,7 @@ export interface NewTask {
   priority?: TaskPriorityCode;
   type?: TaskType;
   parentId?: number;
-  /** Field ids to wire values; built by encodeTaskFields. */
+  /** Field ids to wire values; built by encodeFieldValues. */
   customFields?: Record<string, unknown>;
 }
 
@@ -135,7 +135,7 @@ export type FieldConfig = NumberFieldConfig | BooleanFieldConfig;
 /** What a caller may pass for one field, and what a task shows back: option ids read as option names. null clears. */
 export type FieldValue = string | number | boolean | string[] | null;
 /** A custom field as a task carries it. */
-export interface TaskFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
+export interface CustomFieldValue { id: string; name: string; type: FieldType | null; value: FieldValue; }
 export interface CustomFieldOption { id: string; name: string; color: string; }
 export interface CustomField {
   id: string;
@@ -152,19 +152,97 @@ export interface CustomFieldUpdate { name?: string; config?: FieldConfig; }
 /** PUT on an option replaces both, so an update sends both too. */
 export interface NewFieldOption { name: string; color: OptionColor; }
 
+export type FieldScopeKind = (typeof fieldScopes)[number];
+/** The id each scope kind is addressed by; a kind added to fieldScopes without a row here fails to compile. */
+interface FieldScopeOwners { global: Record<never, never>; project: { projectId: number }; board: { boardId: number }; funnel: { funnelId: string }; }
 /** Where a custom field lives. Each scope has its own routes, so the variant carries the owner's id. */
-export type FieldScope =
-  | { kind: "global" }
-  | { kind: "project"; projectId: number }
-  | { kind: "board"; boardId: number }
-  | { kind: "funnel"; funnelId: string };
+export type FieldScope = { [K in FieldScopeKind]: { kind: K } & FieldScopeOwners[K] }[FieldScopeKind];
 /** Where a global, project or board field can be sent. */
-export type TransferTarget = Exclude<FieldScope, { kind: "funnel" }>;
+export type TransferTarget = Extract<FieldScope, { kind: (typeof transferTargetKinds)[number] }>;
 /** The neighbour a thing is placed next to; the API takes exactly one of the two. */
 export type Placement = { after: string } | { before: string };
 
-/** The id of the funnel is an opaque string (`OLY24hy2mC7n9D9l`), not a UUID — verified live 2026-10-14. */
-export interface Funnel { id: string; name: string; customFields: CustomField[]; }
+export type DealOutcome = (typeof dealOutcomes)[number];
+export type DealSort = (typeof dealSorts)[number];
+export type CrmSort = (typeof crmSorts)[number];
+export type DetailKind = (typeof detailKinds)[number];
+export type DetailOwnerKind = (typeof detailOwnerKinds)[number];
+
+/** Funnel, status and deal ids are opaque 16-character strings (`OLY24hy2mC7n9D9l`), not UUIDs — verified live 2026-10-14. */
+export interface Funnel {
+  id: string; name: string; currencyId: number | null; isPrivate: boolean;
+  dealsCount: number; dealsAmount: number;
+  /** Member ids. */
+  team: string[];
+  customFields: CustomField[];
+}
+export interface NewFunnel { name: string; currencyId?: number; isPrivate: boolean; }
+/** PUT /crm/funnels/{id} replaces all three. */
+export interface FunnelUpdate { name: string; currencyId: number | null; isPrivate: boolean; }
+export interface FunnelStatus { id: string; name: string; dealsCount: number; dealsAmount: number; }
+export interface Currency { id: number; name: string; code: string; symbol: string; }
+
+export interface Deal {
+  id: string; title: string; description: string | null;
+  funnelId: string; statusId: string;
+  amount: number | null;
+  /** The API's `winStatus`. */
+  outcome: DealOutcome | null;
+  /** Member, organization and contact ids. */
+  assignees: string[]; organizations: string[]; contacts: string[];
+  tags: number[];
+  /** Ids of the tasks attached to the deal. */
+  tasks: number[];
+  customFields: CustomFieldValue[];
+  attachments: Attachment[];
+  createdAt: string | null; updatedAt: string | null;
+}
+export interface NewDeal {
+  title: string; amount?: number; outcome?: DealOutcome; description?: string;
+  assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
+  customFields?: Record<string, unknown>;
+}
+/** PATCH: only the fields given; a list given replaces the deal's. */
+export interface DealPatch {
+  title?: string; amount?: number | null; outcome?: DealOutcome | null; description?: string | null;
+  assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
+  customFields?: Record<string, unknown>;
+}
+/** What PUT /crm/deals/{id} takes — a subset of the patch. */
+export type DealReplacement = Pick<DealPatch, "title" | "amount" | "outcome" | "customFields">;
+export type DealQuery = { search?: string; sort?: DealSort; limit?: number; offset?: number };
+export interface DealPage { deals: Deal[]; hasMore: boolean; }
+/** Where a deal goes: a status (null keeps the current one) and the deal it is placed after (null = first). */
+export interface DealPlacement { statusId: string | null; previousDealId: string | null; }
+
+/** An address, email or phone as the API stores it on an organization or a contact. */
+export interface Detail { id: string; value: string; }
+export interface DetailOwner { kind: DetailOwnerKind; id: string; }
+export interface Organization {
+  id: string; name: string; responsibleId: string | null;
+  addresses: Detail[]; emails: Detail[]; phones: Detail[];
+  /** Contact ids. */
+  contacts: string[];
+  tags: number[];
+}
+export interface NewOrganization { name: string; addresses?: string[]; emails?: string[]; phones?: string[]; responsibles?: string[]; }
+/** PUT /crm/organizations/{id} sends name and responsibles only; the detail arrays are omitted so the API keeps them (FOLLOWUPS 24 c). */
+export interface OrganizationUpdate { name: string; responsibles: string[]; }
+export type CrmQuery = { search?: string; sort?: CrmSort; limit?: number; offset?: number };
+export interface OrganizationPage { organizations: Organization[]; hasMore: boolean; }
+export interface Contact {
+  id: string; firstName: string; middleName: string | null; lastName: string | null;
+  /** first + middle + last, the way members are named — what the resolver matches. */
+  name: string;
+  /** Organization ids. */
+  organizations: string[];
+  emails: Detail[]; phones: Detail[];
+  tags: number[];
+}
+export interface NewContact { firstName: string; middleName?: string; lastName?: string; organizations?: string[]; emails?: string[]; phones?: string[]; tags?: number[]; }
+/** PUT /crm/contacts/{id} sends the three names; the other arrays are omitted so the API keeps them (FOLLOWUPS 24 c). */
+export interface ContactUpdate { firstName: string; middleName: string | null; lastName: string | null; }
+export interface ContactPage { contacts: Contact[]; hasMore: boolean; }
 
 /** The fields every task on a board carries, read off a page of its tasks, with every project those tasks sit in. */
 export interface BoardFieldSample { projectIds: number[]; fields: CustomField[]; }
