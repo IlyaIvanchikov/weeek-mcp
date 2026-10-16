@@ -83,7 +83,7 @@ export class DealsApi {
     return toDeal(json.deal);
   }
 
-  // PATCH answers with success only, so the deal is re-read.
+  // PATCH answers with success only, so the deal is re-read. Kept for the operation registry: live it ignores most of its body (FOLLOWUPS 24 f), so weeek_update_deal uses `replace`.
   async update({ dealId, patch }: UpdateDealOptions): Promise<Deal> {
     await this.http.execute<SuccessResponse>(ops.update, { params: { dealId }, body: dealBody(patch) });
     return this.get(dealId);

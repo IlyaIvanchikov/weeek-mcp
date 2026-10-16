@@ -1,5 +1,6 @@
 import type { Config } from "./config.js";
 import type { Operation } from "./operations.js";
+import { asRecord } from "./api/responses.js";
 import { WeeekApiError, WeeekAuthError, WeeekTimeoutError } from "./errors.js";
 
 export type HttpConfig = Pick<Config, "token" | "baseUrl" | "timeoutMs">;
@@ -68,7 +69,8 @@ export class HttpClient {
       headers,
       body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
     });
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // A literal `null` (or any non-object) body reads as empty, so the reads below never throw a TypeError.
+    const json = asRecord(await res.json().catch(() => ({})));
     if (!res.ok) throw new WeeekApiError(describeApiError(json), res.status, `http_${res.status}`);
     // A 200 can still be a refusal: `success: false` with a `reason`, which the start-date smoke hit (FOLLOWUPS 21 b).
     if (json.success === false) throw new WeeekApiError(describeApiError(json), res.status, "refused");

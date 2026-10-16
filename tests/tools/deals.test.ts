@@ -243,13 +243,21 @@ describe("deal tools", () => {
     expect(c.crm.deals.addAssignee).toHaveBeenCalledWith({ dealId: sale.id, memberId: ann.id });
   });
 
+  it("weeek_update_deal given by title syncs links against a fresh read, not the cached search entry", async () => {
+    const { c, h } = harness();
+    c.crm.deals.get.mockImplementation(async () => ({ ...sale, assignees: [ann.id] }));
+    await h.call("weeek_update_deal", { deal: "Sale", status: statusNew.id, title: "Sale 2", assignees: ["Ann"] });
+    expect(c.crm.deals.addAssignee).not.toHaveBeenCalled();
+    expect(c.crm.deals.removeAssignee).not.toHaveBeenCalled();
+  });
+
   it("weeek_update_deal removes the organization, contact and tag the lists leave out", async () => {
     const { c, h } = harness();
     const oldOrganizationId = "00000000-0000-4000-8000-000000000001";
     const oldContactId = "00000000-0000-4000-8000-000000000002";
     const oldTagId = 9;
     const linked = { ...sale, organizations: [oldOrganizationId], contacts: [oldContactId], tags: [oldTagId] } as unknown as typeof sale;
-    c.crm.deals.tryGet.mockImplementation(async (id: string) => (id === sale.id ? linked : null));
+    c.crm.deals.get.mockImplementation(async () => linked);
     await h.call("weeek_update_deal", { deal: sale.id, organizations: ["Acme"], contacts: ["Ann Lee"], tags: ["VIP"] });
     expect(c.crm.deals.removeOrganization).toHaveBeenCalledWith({ dealId: sale.id, organizationId: oldOrganizationId });
     expect(c.crm.deals.removeContact).toHaveBeenCalledWith({ dealId: sale.id, contactId: oldContactId });

@@ -98,7 +98,9 @@ Upgrading from 1.0.0: `weeek_create_task` / `weeek_update_task` `due` now actual
 (the key sent before was ignored by the API); `weeek_update_deal` now applies custom fields and the
 four link lists, and lost `description` (the API only sets it on create);
 `weeek_create_organization` / `weeek_update_organization` take one `responsible` instead of
-`responsibles` (the list was ignored); `weeek_list_deals` lost `sort: "amount"` (the API answers 500).
+`responsibles` (the list was ignored); `weeek_list_deals` lost `sort: "amount"` (the API answers 500);
+`weeek_update_project` `color` must now be `#` and six hex digits; a 200 the API marks
+`success: false` (e.g. a plan limit) is now reported as an error.
 
 Upgrading from 0.7.0: no tool was renamed or removed; `WEEEK_TOOLSETS=tasks` is still the
 default. Opt in with `crm` or `all`.

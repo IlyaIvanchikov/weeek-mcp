@@ -84,6 +84,12 @@ describe("HttpClient.execute", () => {
     await expect(http.execute(op, { params: { taskId: 1 } })).rejects.toMatchObject({ name: "WeeekApiError", status: 200, code: "refused", message: "WEEEK refused the request (reason: limit)" });
   });
 
+  it("reads a literal null body as an empty object", async () => {
+    const f = jsonFetch(200, null);
+    const http = new HttpClient(cfg, f as unknown as typeof fetch);
+    await expect(http.execute(op, { params: { taskId: 7 } })).resolves.toEqual({});
+  });
+
   it("passes a 2xx without a success flag through — a 204-style empty body", async () => {
     const f = vi.fn(async () => new Response(null, { status: 204 }));
     const http = new HttpClient(cfg, f as unknown as typeof fetch);

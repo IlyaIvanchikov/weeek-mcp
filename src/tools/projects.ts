@@ -41,7 +41,7 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
   });
 
   registerJsonTool(server, "weeek_update_project", {
-    description: "Rename a WEEEK project (by name or id) or change its privacy or colour (# and six hex digits). Fields you omit keep their current value.",
+    description: "Rename a WEEEK project (by name or id) or change its privacy or colour (# and six hex digits). Fields you omit keep their current value. An archived project is not in the project list, so give it by id.",
     inputSchema: { project: nameOrId, name: z.string().min(1).optional(), private: z.boolean().optional(), color: hexColor.optional() },
   }, async (args) => {
     const projectId = await resolver.resolve({ kind: "project", value: args.project });

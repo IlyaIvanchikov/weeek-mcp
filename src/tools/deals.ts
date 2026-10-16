@@ -116,9 +116,12 @@ export function registerDealTools({ server, client, resolver, attachPolicy }: To
     if (args.outcome !== undefined) replacement.outcome = args.outcome;
     if (args.fields !== undefined) replacement.customFields = await encodeDealFields(resolver, deal.funnelId, args.fields);
     // PUT, not PATCH: PATCH ignores customFields and the lists (FOLLOWUPS 24 f); PUT keeps what it is not sent.
+    const givesLinks = args.assignees !== undefined || args.organizations !== undefined || args.contacts !== undefined || args.tags !== undefined;
+    // Read fresh: a deal given by title comes from a search entry up to 60 s old, and the link diff must follow what the deal has now.
+    const currentDeal = givesLinks ? await client.crm.deals.get(deal.id) : deal;
     try {
       if (Object.keys(replacement).length > 0) await client.crm.deals.replace({ dealId: deal.id, replacement });
-      await syncDealLinks(client, deal, links);
+      await syncDealLinks(client, currentDeal, links);
     } finally {
       // A write that failed half-way has still changed the deal, so the cached searches go either way.
       resolver.forget({ kind: "deal" });
