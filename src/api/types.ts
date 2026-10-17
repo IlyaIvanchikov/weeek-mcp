@@ -74,7 +74,9 @@ export interface WeeekTask {
 
 export interface NewTask {
   title: string; projectId: number; boardColumnId?: number;
-  description?: string; userId?: string; dayFrom?: string;
+  description?: string; userId?: string;
+  /** The due date in `d.m.Y`, the one format the create route honours; `dayFrom` was ignored (FOLLOWUPS 21 b). */
+  day?: string;
   /** Wire code; use priorityCode() to build it from a name. */
   priority?: TaskPriorityCode;
   type?: TaskType;
@@ -202,13 +204,13 @@ export interface NewDeal {
   assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
   customFields?: Record<string, unknown>;
 }
-/** PATCH: only the fields given; a list given replaces the deal's. */
+/** PATCH: the spec's body. Live, the API honours only title, amount and outcome and ignores the rest (FOLLOWUPS 24 f); the tool uses PUT. */
 export interface DealPatch {
   title?: string; amount?: number | null; outcome?: DealOutcome | null; description?: string | null;
   assignees?: string[]; organizations?: string[]; contacts?: string[]; tags?: number[];
   customFields?: Record<string, unknown>;
 }
-/** What PUT /crm/deals/{id} takes — a subset of the patch. */
+/** What PUT /crm/deals/{id} takes; it keeps every field it is not sent, and null clears a custom field (FOLLOWUPS 24 f). */
 export type DealReplacement = Pick<DealPatch, "title" | "amount" | "outcome" | "customFields">;
 export type DealQuery = { search?: string; sort?: DealSort; limit?: number; offset?: number };
 export interface DealPage { deals: Deal[]; hasMore: boolean; }
@@ -225,9 +227,10 @@ export interface Organization {
   contacts: string[];
   tags: number[];
 }
-export interface NewOrganization { name: string; addresses?: string[]; emails?: string[]; phones?: string[]; responsibles?: string[]; }
-/** PUT /crm/organizations/{id} sends name and responsibles only; the detail arrays are omitted so the API keeps them (FOLLOWUPS 24 c). */
-export interface OrganizationUpdate { name: string; responsibles: string[]; }
+/** `responsibleId` is the key the API honours; the spec's plural members list is ignored (verified 2026-10-15, FOLLOWUPS 24 h). */
+export interface NewOrganization { name: string; addresses?: string[]; emails?: string[]; phones?: string[]; responsibleId?: string; }
+/** PUT /crm/organizations/{id} sends name and responsibleId only; the detail arrays are omitted so the API keeps them (FOLLOWUPS 24 c). null clears the responsible. */
+export interface OrganizationUpdate { name: string; responsibleId: string | null; }
 export type CrmQuery = { search?: string; sort?: CrmSort; limit?: number; offset?: number };
 export interface OrganizationPage { organizations: Organization[]; hasMore: boolean; }
 export interface Contact {

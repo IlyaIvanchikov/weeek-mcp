@@ -20,6 +20,10 @@ const deal = {
 const api = (f: ReturnType<typeof jsonFetch>) => new DealsApi(httpWith(f));
 
 describe("toDeal", () => {
+  it("reads tags sent as objects as their ids", () => {
+    expect(toDeal({ ...rawDeal, tags: [{ id: 16, title: "VIP", color: "#F900EA" }] }).tags).toEqual([16]);
+  });
+
   it("defaults missing fields and ignores an unknown outcome", () => {
     expect(toDeal({ id: dealId, winStatus: "maybe" })).toEqual({
       id: dealId, title: "", description: null, funnelId: "", statusId: "", amount: null, outcome: null,
@@ -31,8 +35,8 @@ describe("toDeal", () => {
 describe("DealsApi", () => {
   it("list GETs the status's deals with the query and reports hasMoreDeals", async () => {
     const f = jsonFetch(200, { success: true, deals: [rawDeal], hasMoreDeals: true });
-    expect(await api(f).list({ statusId, query: { search: "sa", sort: "amount", limit: 50 } })).toEqual({ deals: [deal], hasMore: true });
-    expect(sent(f).url).toBe(`${base}/statuses/${statusId}/deals?search=sa&sort=amount&limit=50`);
+    expect(await api(f).list({ statusId, query: { search: "sa", sort: "title", limit: 50 } })).toEqual({ deals: [deal], hasMore: true });
+    expect(sent(f).url).toBe(`${base}/statuses/${statusId}/deals?search=sa&sort=title&limit=50`);
   });
   it("get GETs /crm/deals/{id}; tryGet is null on a 404", async () => {
     const f = jsonFetch(200, { success: true, deal: rawDeal });

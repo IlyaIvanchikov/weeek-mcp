@@ -36,12 +36,22 @@ describe("project tools", () => {
 
   it("weeek_update_project merges over the current project so omitted fields survive", async () => {
     const c = client();
-    const update = vi.fn(async () => ({ ...marketing, color: "#000" }));
+    const update = vi.fn(async () => ({ ...marketing, color: "#000000" }));
     const h = toolHarness(registerProjectTools, { ...c, projects: { ...c.projects, update } });
-    await h.call("weeek_update_project", { project: 1, color: "#000" });
-    expect(update).toHaveBeenCalledWith({ projectId: 1, update: { name: "Marketing", isPrivate: false, color: "#000" } });
+    await h.call("weeek_update_project", { project: 1, color: "#000000" });
+    expect(update).toHaveBeenCalledWith({ projectId: 1, update: { name: "Marketing", isPrivate: false, color: "#000000" } });
     await h.call("weeek_update_project", { project: 1, name: "Mkt", private: true });
     expect(update).toHaveBeenLastCalledWith({ projectId: 1, update: { name: "Mkt", isPrivate: true, color: "#fff" } });
+  });
+
+  it("weeek_update_project takes a colour only as # and six hex digits, the form the API returns", async () => {
+    const c = client();
+    const update = vi.fn(async () => marketing);
+    const h = toolHarness(registerProjectTools, { ...c, projects: { ...c.projects, update } });
+    await expect(async () => h.call("weeek_update_project", { project: 1, color: "red" })).rejects.toThrow(/hex/);
+    expect(update).not.toHaveBeenCalled();
+    await h.call("weeek_update_project", { project: 1, color: "#1E88E5" });
+    expect(update).toHaveBeenCalledWith({ projectId: 1, update: { name: "Marketing", isPrivate: false, color: "#1E88E5" } });
   });
 
   it("weeek_archive_project needs confirm:true, defaults to archiving, and can restore", async () => {

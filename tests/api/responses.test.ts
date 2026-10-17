@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { asRecord, fullName, isOneOf, pickArray, stringList, toMember, toProfile, toWorkspace } from "../../src/api/responses.js";
+import { asRecord, fullName, isOneOf, pickArray, pickEntity, stringList, tagIdList, toMember, toProfile, toWorkspace } from "../../src/api/responses.js";
 
 describe("pickArray", () => {
   it("returns the array under the expected key", () => {
@@ -67,5 +67,22 @@ describe("fullName and stringList", () => {
   });
   it("toMember names a member by first and last name, ignoring a middle name", () => {
     expect(toMember({ id: "u1", firstName: "Ann", middleName: "B", lastName: "Lee" })).toEqual({ id: "u1", name: "Ann Lee" });
+  });
+});
+
+describe("pickEntity", () => {
+  it("reads the spec's key, and falls back to `data`, which the board custom-field route answers instead", () => {
+    const field = { id: "f1", name: "Lane", type: "text" };
+    expect(pickEntity({ success: true, customField: field }, "customField")).toBe(field);
+    expect(pickEntity({ success: true, data: field }, "customField")).toBe(field);
+    expect(pickEntity({ success: true }, "customField")).toBeUndefined();
+  });
+});
+
+describe("tagIdList", () => {
+  it("reads plain ids, and the { id, title, color } objects the deal routes send (FOLLOWUPS 24)", () => {
+    expect(tagIdList([5, "6"])).toEqual([5, 6]);
+    expect(tagIdList([{ id: 16, title: "VIP", color: "#F900EA" }])).toEqual([16]);
+    expect(tagIdList(undefined)).toEqual([]);
   });
 });

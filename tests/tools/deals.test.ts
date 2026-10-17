@@ -28,10 +28,11 @@ const client = () => ({
     deals: {
       list: vi.fn(async ({ statusId }: { statusId: string }) => ({ deals: statusId === statusNew.id ? [sale, other] : [], hasMore: statusId === statusNew.id })),
       get: vi.fn(async () => sale), tryGet: vi.fn(async (id: string) => (id === sale.id ? sale : null)),
-      create: vi.fn(async () => sale), update: vi.fn(async () => sale), remove: vi.fn(async () => ok),
+      create: vi.fn(async () => sale), update: vi.fn(async () => sale), replace: vi.fn(async () => sale), remove: vi.fn(async () => ok),
       move: vi.fn(async () => ok), setFunnel: vi.fn(async () => ok), setStatus: vi.fn(async () => ok),
       addAssignee: vi.fn(async () => ok), removeAssignee: vi.fn(async () => ok),
       addOrganization: vi.fn(async () => ok), removeOrganization: vi.fn(async () => ok),
+      addContact: vi.fn(async () => ok), removeContact: vi.fn(async () => ok), addTag: vi.fn(async () => ok), removeTag: vi.fn(async () => ok),
       addTask: vi.fn(async () => ({ id: 78, title: "Call" })), moveTask: vi.fn(async () => ok), removeTask: vi.fn(async () => ok),
       uploadAttachment: vi.fn(async () => []),
     },
@@ -44,8 +45,8 @@ const harness = () => { const c = client(); return { c, h: toolHarness(registerD
 describe("deal tools", () => {
   it("weeek_list_deals lists one status, or every status of a funnel, and needs one of the two", async () => {
     const { c, h } = harness();
-    expect(reply(await h.call("weeek_list_deals", { status: statusNew.id, search: "sa", sort: "amount", limit: 10 }))).toEqual({ deals: [sale, other], hasMore: true });
-    expect(c.crm.deals.list).toHaveBeenCalledWith({ statusId: statusNew.id, query: { search: "sa", sort: "amount", limit: 10, offset: 0 } });
+    expect(reply(await h.call("weeek_list_deals", { status: statusNew.id, search: "sa", sort: "title", limit: 10 }))).toEqual({ deals: [sale, other], hasMore: true });
+    expect(c.crm.deals.list).toHaveBeenCalledWith({ statusId: statusNew.id, query: { search: "sa", sort: "title", limit: 10, offset: 0 } });
     expect(reply(await h.call("weeek_list_deals", { funnel: "Sales" }))).toEqual({ deals: [sale, other], hasMore: true });
     expect(c.crm.deals.list).toHaveBeenCalledTimes(3);
     const res = await h.call("weeek_list_deals", {});
@@ -78,11 +79,46 @@ describe("deal tools", () => {
     expect(c.crm.deals.create).not.toHaveBeenCalled();
   });
 
-  it("weeek_update_deal patches only what is given and scopes fields to the deal's funnel", async () => {
+  it("weeek_update_deal PUTs the scalars and fields — PATCH ignores most of them — then re-reads the deal", async () => {
     const { c, h } = harness();
-    await h.call("weeek_update_deal", { deal: sale.id, amount: null, outcome: "lost", assignees: ["Ilya", "Ann"], fields: { Stage: "Hot" } });
-    expect(c.crm.deals.update).toHaveBeenCalledWith({ dealId: sale.id, patch: { amount: null, outcome: "lost", assignees: [ilya.id, ann.id], customFields: { [stage.id]: "o1" } } });
+    expect(reply(await h.call("weeek_update_deal", { deal: sale.id, amount: null, outcome: "lost", fields: { Stage: "Hot" } }))).toEqual(sale);
+    expect(c.crm.deals.replace).toHaveBeenCalledWith({ dealId: sale.id, replacement: { amount: null, outcome: "lost", customFields: { [stage.id]: "o1" } } });
+    expect(c.crm.deals.update).not.toHaveBeenCalled();
     expect(c.customFields.list).toHaveBeenCalledWith({ kind: "funnel", funnelId });
+    expect(c.crm.deals.get).toHaveBeenLastCalledWith(sale.id);
+  });
+
+  it("weeek_update_deal syncs each list through the add/remove routes: adds the missing, removes the unlisted", async () => {
+    const { c, h } = harness();
+    await h.call("weeek_update_deal", { deal: sale.id, assignees: ["Ann"], organizations: ["Acme"], contacts: ["Ann Lee"], tags: ["VIP"] });
+    expect(c.crm.deals.addAssignee).toHaveBeenCalledWith({ dealId: sale.id, memberId: ann.id });
+    expect(c.crm.deals.removeAssignee).toHaveBeenCalledWith({ dealId: sale.id, memberId: ilya.id });
+    expect(c.crm.deals.addOrganization).toHaveBeenCalledWith({ dealId: sale.id, organizationId });
+    expect(c.crm.deals.addContact).toHaveBeenCalledWith({ dealId: sale.id, contactId });
+    expect(c.crm.deals.addTag).toHaveBeenCalledWith({ dealId: sale.id, tagId: 5 });
+    for (const untouched of [c.crm.deals.removeOrganization, c.crm.deals.removeContact, c.crm.deals.removeTag, c.crm.deals.replace]) expect(untouched).not.toHaveBeenCalled();
+  });
+
+  it("weeek_update_deal with a list that already matches sends no link call", async () => {
+    const { c, h } = harness();
+    await h.call("weeek_update_deal", { deal: sale.id, assignees: [ilya.id] });
+    expect(c.crm.deals.addAssignee).not.toHaveBeenCalled();
+    expect(c.crm.deals.removeAssignee).not.toHaveBeenCalled();
+  });
+
+  it("weeek_update_deal with scalars only sends one PUT and no link call", async () => {
+    const { c, h } = harness();
+    await h.call("weeek_update_deal", { deal: sale.id, title: "Sale 2" });
+    expect(c.crm.deals.replace).toHaveBeenCalledTimes(1);
+    for (const link of [c.crm.deals.addAssignee, c.crm.deals.removeAssignee, c.crm.deals.addOrganization, c.crm.deals.addContact, c.crm.deals.addTag]) expect(link).not.toHaveBeenCalled();
+  });
+
+  it("weeek_update_deal resolves every name before the first write", async () => {
+    const { c, h } = harness();
+    const res = await h.call("weeek_update_deal", { deal: sale.id, title: "Sale 2", assignees: ["Nobody"] });
+    expect(res.isError).toBe(true);
+    expect(reply(res).candidates).toBeDefined();
+    expect(c.crm.deals.replace).not.toHaveBeenCalled();
   });
 
   it("weeek_delete_deal needs confirm:true", async () => {
@@ -187,5 +223,44 @@ describe("deal tools", () => {
     await h.call("weeek_update_deal", { deal: sale.id, title: "Sale 2" });
     await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
     expect(c.crm.deals.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("weeek_update_deal forgets the cached deal searches even when a link call fails after the PUT", async () => {
+    const { c, h } = harness();
+    c.crm.deals.addTag.mockRejectedValueOnce(new Error("boom"));
+    await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
+    const res = await h.call("weeek_update_deal", { deal: sale.id, title: "Sale 2", tags: ["VIP"] });
+    expect(res.isError).toBe(true);
+    expect(c.crm.deals.replace).toHaveBeenCalledTimes(1);
+    await h.call("weeek_get_deal", { deal: "Sale", status: statusNew.id });
+    expect(c.crm.deals.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("weeek_update_deal adds a link once when the list names it twice", async () => {
+    const { c, h } = harness();
+    await h.call("weeek_update_deal", { deal: sale.id, assignees: ["Ann", ann.id] });
+    expect(c.crm.deals.addAssignee).toHaveBeenCalledTimes(1);
+    expect(c.crm.deals.addAssignee).toHaveBeenCalledWith({ dealId: sale.id, memberId: ann.id });
+  });
+
+  it("weeek_update_deal given by title syncs links against a fresh read, not the cached search entry", async () => {
+    const { c, h } = harness();
+    c.crm.deals.get.mockImplementation(async () => ({ ...sale, assignees: [ann.id] }));
+    await h.call("weeek_update_deal", { deal: "Sale", status: statusNew.id, title: "Sale 2", assignees: ["Ann"] });
+    expect(c.crm.deals.addAssignee).not.toHaveBeenCalled();
+    expect(c.crm.deals.removeAssignee).not.toHaveBeenCalled();
+  });
+
+  it("weeek_update_deal removes the organization, contact and tag the lists leave out", async () => {
+    const { c, h } = harness();
+    const oldOrganizationId = "00000000-0000-4000-8000-000000000001";
+    const oldContactId = "00000000-0000-4000-8000-000000000002";
+    const oldTagId = 9;
+    const linked = { ...sale, organizations: [oldOrganizationId], contacts: [oldContactId], tags: [oldTagId] } as unknown as typeof sale;
+    c.crm.deals.get.mockImplementation(async () => linked);
+    await h.call("weeek_update_deal", { deal: sale.id, organizations: ["Acme"], contacts: ["Ann Lee"], tags: ["VIP"] });
+    expect(c.crm.deals.removeOrganization).toHaveBeenCalledWith({ dealId: sale.id, organizationId: oldOrganizationId });
+    expect(c.crm.deals.removeContact).toHaveBeenCalledWith({ dealId: sale.id, contactId: oldContactId });
+    expect(c.crm.deals.removeTag).toHaveBeenCalledWith({ dealId: sale.id, tagId: oldTagId });
   });
 });

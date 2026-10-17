@@ -36,12 +36,12 @@ describe("TasksApi", () => {
 
   it("create POSTs title + locations and optional fields only when given", async () => {
     const f = jsonFetch(200, { success: true, task: { ...rawTask, id: 5 } });
-    const t = await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, boardColumnId: 2, userId: "u1", dayFrom: "2026-08-01", priority: 2, type: "call", parentId: 70 });
+    const t = await new TasksApi(httpWith(f)).create({ title: "T", projectId: 1, boardColumnId: 2, userId: "u1", day: "01.08.2026", priority: 2, type: "call", parentId: 70 });
     expect(t.id).toBe(5);
     const { url, init, json } = sent(f);
     expect(url).toBe("https://api.weeek.net/public/v1/tm/tasks");
     expect(init.method).toBe("POST");
-    expect(json()).toEqual({ title: "T", locations: [{ projectId: 1, boardColumnId: 2 }], userId: "u1", dayFrom: "2026-08-01", priority: 2, type: "call", parentId: 70 });
+    expect(json()).toEqual({ title: "T", locations: [{ projectId: 1, boardColumnId: 2 }], userId: "u1", day: "01.08.2026", priority: 2, type: "call", parentId: 70 });
   });
 
   it("get surfaces assignees, boardId, dueDate and attachments", async () => {
@@ -232,10 +232,13 @@ describe("TasksApi", () => {
     expect(t.timeEntries).toEqual([]);
   });
 
-  it("getFields reads a task's fields with their options off GET /tm/tasks/{id}", async () => {
-    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "0b1e4d7c-2222-4aaa-8bbb-000000000002", name: "Review", color: "blue" }], value: null };
+  it("getWithFields reads the task and its fields with their options off one GET /tm/tasks/{id}", async () => {
+    const rawField = { id: "0b1e4d7c-1111-4aaa-8bbb-000000000001", name: "Stage", type: "select", options: [{ id: "o1", name: "Review", color: "blue" }], value: "o1" };
     const f = jsonFetch(200, { success: true, task: { ...rawTask, customFields: [rawField] } });
-    expect(await new TasksApi(httpWith(f)).getFields(78)).toEqual([{ id: rawField.id, name: "Stage", type: "select", config: null, options: rawField.options }]);
+    const { task, fields } = await new TasksApi(httpWith(f)).getWithFields(78);
+    expect(task.dueDate).toBe("2026-07-22");
+    expect(task.customFields).toEqual([{ id: rawField.id, name: "Stage", type: "select", value: "Review" }]);
+    expect(fields).toEqual([{ id: rawField.id, name: "Stage", type: "select", config: null, options: rawField.options }]);
     expect(sent(f).url).toBe("https://api.weeek.net/public/v1/tm/tasks/78");
   });
 

@@ -1,6 +1,6 @@
 import type { HttpClient } from "../../http.js";
 import { operations } from "../../operations.js";
-import { asRecord, pageHasMore, pickArray, stringList } from "../responses.js";
+import { asRecord, pageHasMore, pickArray, stringList, tagIdList } from "../responses.js";
 import { orNullWhenMissing } from "../requests.js";
 import { toDetails } from "./details.js";
 import type { CrmQuery, NewOrganization, Organization, OrganizationPage, OrganizationUpdate, SuccessResponse } from "../types.js";
@@ -21,7 +21,7 @@ export function toOrganization(raw: unknown): Organization {
     emails: toDetails(r.emails, "email"),
     phones: toDetails(r.phones, "phone"),
     contacts: stringList(r.contacts),
-    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    tags: tagIdList(r.tags),
   };
 }
 

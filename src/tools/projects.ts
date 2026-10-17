@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolContext } from "../toolsets/types.js";
 import type { Resolver } from "../resolver.js";
 import { destructiveAnnotations } from "./constants.js";
-import { confirmation, nameOrId } from "./inputs.js";
+import { confirmation, hexColor, nameOrId } from "./inputs.js";
 import { registerJsonTool } from "./json-tool.js";
 
 interface BoardRef { board: string | number; project?: string | number; }
@@ -41,8 +41,8 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
   });
 
   registerJsonTool(server, "weeek_update_project", {
-    description: "Rename a WEEEK project (by name or id) or change its privacy or colour. Fields you omit keep their current value.",
-    inputSchema: { project: nameOrId, name: z.string().min(1).optional(), private: z.boolean().optional(), color: z.string().min(1).optional() },
+    description: "Rename a WEEEK project (by name or id) or change its privacy or colour (# and six hex digits). Fields you omit keep their current value. An archived project is not in the project list, so give it by id.",
+    inputSchema: { project: nameOrId, name: z.string().min(1).optional(), private: z.boolean().optional(), color: hexColor.optional() },
   }, async (args) => {
     const projectId = await resolver.resolve({ kind: "project", value: args.project });
     // PUT replaces name and isPrivate, so the current values are read first.
@@ -56,7 +56,7 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
   });
 
   registerJsonTool(server, "weeek_archive_project", {
-    description: "Archive a WEEEK project (archived:true, the default) or restore an archived one (archived:false). Requires confirm:true. Prefer this over weeek_delete_project when the tasks must survive.",
+    description: "Archive a WEEEK project (archived:true, the default) or restore an archived one (archived:false). Requires confirm:true. An archived project is not in the project list, so give it by id, not by name. Prefer this over weeek_delete_project when the tasks must survive.",
     inputSchema: { project: nameOrId, archived: z.boolean().default(true), confirm: confirmation },
     annotations: destructiveAnnotations,
   }, async (args) => {
@@ -67,7 +67,7 @@ export function registerProjectTools({ server, client, resolver }: ToolContext):
   });
 
   registerJsonTool(server, "weeek_delete_project", {
-    description: "Permanently delete a WEEEK project and everything in it. Irreversible; requires confirm:true. To hide a project without losing it use weeek_archive_project.",
+    description: "Permanently delete a WEEEK project and everything in it. Irreversible; requires confirm:true. An archived project is not in the project list, so give it by id, not by name. To hide a project without losing it use weeek_archive_project.",
     inputSchema: { project: nameOrId, confirm: confirmation },
     annotations: destructiveAnnotations,
   }, async (args) => {

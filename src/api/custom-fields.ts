@@ -1,6 +1,6 @@
 import type { HttpClient, PathParams } from "../http.js";
 import { operations, type Operation } from "../operations.js";
-import { asRecord, isOneOf, pickArray } from "./responses.js";
+import { asRecord, isOneOf, pickArray, pickEntity } from "./responses.js";
 import { booleanStyles, fieldTypes, numberFormats } from "./constants.js";
 import type { ProjectsApi } from "./projects.js";
 import type { TasksApi } from "./tasks.js";
@@ -154,13 +154,13 @@ export class CustomFieldsApi {
   async create({ scope, field }: CreateFieldOptions): Promise<CustomField> {
     const { routes, params } = routingOf(scope);
     const json = await this.http.execute<{ customField: unknown }>(routes.create, { params, body: field });
-    return toCustomField(json.customField);
+    return toCustomField(pickEntity(json, "customField"));
   }
 
   async update({ scope, fieldId, update }: UpdateFieldOptions): Promise<CustomField> {
     const { routes, params } = routingOf(scope);
     const json = await this.http.execute<{ customField: unknown }>(routes.update, { params: { ...params, fieldId }, body: update });
-    return toCustomField(json.customField);
+    return toCustomField(pickEntity(json, "customField"));
   }
 
   async remove({ scope, fieldId }: FieldRef): Promise<SuccessResponse> {
@@ -181,13 +181,13 @@ export class CustomFieldsApi {
   async createOption({ scope, fieldId, option }: CreateOptionOptions): Promise<CustomFieldOption> {
     const { routes, params } = routingOf(scope);
     const json = await this.http.execute<{ option: unknown }>(routes.createOption, { params: { ...params, fieldId }, body: option });
-    return toFieldOption(json.option);
+    return toFieldOption(pickEntity(json, "option"));
   }
 
   async updateOption({ scope, fieldId, optionId, option }: UpdateOptionOptions): Promise<CustomFieldOption> {
     const { routes, params } = routingOf(scope);
     const json = await this.http.execute<{ option: unknown }>(routes.updateOption, { params: { ...params, fieldId, optionId }, body: option });
-    return toFieldOption(json.option);
+    return toFieldOption(pickEntity(json, "option"));
   }
 
   async removeOption({ scope, fieldId, optionId }: OptionRef): Promise<SuccessResponse> {

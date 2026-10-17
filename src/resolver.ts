@@ -86,7 +86,7 @@ const OPAQUE_ID_RE = /^[A-Za-z0-9]{16}$/;
 const boardScopeNeed = "a project (name or id)";
 const columnScopeNeed = "a board or a project (name or id)";
 const statusScopeNeed = "a funnel (name or id)";
-const dealScopeNeed = "a funnel or a status (name or id)";
+const dealScopeNeed = "a funnel or a status (name or id); a 16-character value that is no deal's id is searched as a title";
 
 function requireScope<T>(value: T | undefined, label: string, needed: string): T {
   if (value === undefined) throw new Error(`resolving a ${label} by name needs ${needed}`);

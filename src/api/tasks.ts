@@ -1,7 +1,7 @@
 import type { HttpClient, Query } from "../http.js";
 import { operations } from "../operations.js";
 import { apiFlag, attachmentForm, pickAttachments } from "./requests.js";
-import { asRecord, isOneOf, pickArray } from "./responses.js";
+import { asRecord, isOneOf, pickArray, tagIdList } from "./responses.js";
 import { priorityName } from "./priority.js";
 import { taskTypes } from "./constants.js";
 import { toCustomField, toFieldValue } from "./custom-fields.js";
@@ -20,6 +20,8 @@ export interface SetParentOptions { taskId: number; parentId: number | null; }
 export interface AddTimeEntryOptions { taskId: number; entry: TimeEntryFields; }
 export interface UpdateTimeEntryOptions { taskId: number; timeEntryId: string; entry: TimeEntryFields; }
 export interface TimeEntryRef { taskId: number; timeEntryId: string; }
+
+export interface TaskWithFields { task: WeeekTask; fields: CustomField[]; }
 
 const ops = operations.tasks;
 
@@ -87,7 +89,7 @@ export function toTask(raw: unknown): WeeekTask {
     completedAt: optionalString(r.completedAt),
     createdAt: optionalString(r.createdAt),
     duration: optionalNumber(r.duration),
-    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    tags: tagIdList(r.tags),
     locations: Array.isArray(r.locations) ? r.locations.map(toLocation) : [],
     timeEntries: Array.isArray(r.timeEntries) ? r.timeEntries.map(toTimeEntry) : [],
     // The API returns these with every task; surfacing them is what lets a caller see a
@@ -111,7 +113,7 @@ export class TasksApi {
     const payload: Record<string, unknown> = { title: newTask.title, locations: [location] };
     if (newTask.description !== undefined) payload.description = newTask.description;
     if (newTask.userId !== undefined) payload.userId = newTask.userId;
-    if (newTask.dayFrom !== undefined) payload.dayFrom = newTask.dayFrom;
+    if (newTask.day !== undefined) payload.day = newTask.day;
     if (newTask.priority !== undefined) payload.priority = newTask.priority;
     if (newTask.type !== undefined) payload.type = newTask.type;
     if (newTask.parentId !== undefined) payload.parentId = newTask.parentId;
@@ -120,10 +122,13 @@ export class TasksApi {
     return toTask(json.task);
   }
 
-  /** A task's fields with their options — what a value by name is resolved against. */
-  async getFields(taskId: number): Promise<CustomField[]> {
+  /**
+   * The task and its fields with their options, off one GET: what weeek_update_task resolves a
+   * field value by name against, and where it reads the due date a start date must travel with.
+   */
+  async getWithFields(taskId: number): Promise<TaskWithFields> {
     const json = await this.http.execute<{ task: unknown }>(ops.get, { params: { taskId } });
-    return fieldsOf(json.task);
+    return { task: toTask(json.task), fields: fieldsOf(json.task) };
   }
 
   /**

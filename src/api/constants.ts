@@ -24,7 +24,8 @@ export const booleanStyles = ["radio", "checkbox"] as const;
 
 // CRM. Deal outcomes and the sort keys are the spec's enums; the detail vocabulary is ours.
 export const dealOutcomes = ["won", "lost", "archived"] as const;
-export const dealSorts = ["title", "amount", "commented", "createdAt", "updatedAt"] as const;
+// `amount` is in the spec's enum but the API answers 500 to it (verified 2026-10-15, FOLLOWUPS 24 k); the other four work.
+export const dealSorts = ["title", "commented", "createdAt", "updatedAt"] as const;
 export const crmSorts = ["alphabet", "updatedAt"] as const;
 export const detailKinds = ["address", "email", "phone"] as const;
 export const detailOwnerKinds = ["organization", "contact"] as const;
