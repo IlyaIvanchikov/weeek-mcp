@@ -5,6 +5,7 @@
 [![CI](https://github.com/IlyaIvanchikov/weeek-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/IlyaIvanchikov/weeek-mcp/actions/workflows/test.yml)
 [![node](https://img.shields.io/node/v/weeek-mcp-smart.svg)](https://www.npmjs.com/package/weeek-mcp-smart)
 [![license](https://img.shields.io/npm/l/weeek-mcp-smart.svg)](./LICENSE)
+[![IlyaIvanchikov/weeek-mcp MCP server](https://glama.ai/mcp/servers/IlyaIvanchikov/weeek-mcp/badges/score.svg)](https://glama.ai/mcp/servers/IlyaIvanchikov/weeek-mcp)
 
 **The only one-click WEEEK MCP server** — it takes **names, not IDs**. Create a task in one call:
 
@@ -21,6 +22,17 @@ No `list_projects → list_boards → list_columns → list_members` dance first
 <!-- DEMO: drop a gif/screenshot here — an agent creating a task by name in one call.
      Your PROMOTE.md calls this the biggest single stars lever. Suggested: ![demo](docs/demo.gif) -->
 
+
+## Where it is published
+
+| Where | Link |
+|---|---|
+| npm | [`weeek-mcp-smart`](https://www.npmjs.com/package/weeek-mcp-smart) |
+| Official MCP registry | `io.github.IlyaIvanchikov/weeek-mcp-smart` ([registry](https://registry.modelcontextprotocol.io/v0/servers?search=weeek-mcp-smart)) |
+| Glama | [glama.ai/mcp/servers/IlyaIvanchikov/weeek-mcp](https://glama.ai/mcp/servers/IlyaIvanchikov/weeek-mcp) |
+| GitHub Releases | [latest release](https://github.com/IlyaIvanchikov/weeek-mcp/releases/latest), with the one-click [`weeek-mcp-smart.mcpb`](https://github.com/IlyaIvanchikov/weeek-mcp/releases/latest/download/weeek-mcp-smart.mcpb) for Claude Desktop |
+
+Every `v*` tag publishes to npm, the MCP registry and GitHub Releases in one CI run; Glama re-indexes the repository on its own schedule.
 
 ## Install (Claude Code / Cursor)
 
@@ -73,8 +85,8 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `crm` | `weeek_list_funnels`, `weeek_get_funnel`, `weeek_create_funnel`, `weeek_update_funnel`, `weeek_delete_funnel`, `weeek_list_statuses`, `weeek_get_status`, `weeek_create_status`, `weeek_update_status`, `weeek_delete_status`, `weeek_list_currencies`, `weeek_list_deals`, `weeek_get_deal`, `weeek_create_deal`, `weeek_update_deal`, `weeek_delete_deal`, `weeek_move_deal`, `weeek_add_deal_assignees`, `weeek_remove_deal_assignees`, `weeek_attach_organization`, `weeek_detach_organization`, `weeek_add_deal_task`, `weeek_move_deal_task`, `weeek_remove_deal_task`, `weeek_attach_deal_file`, `weeek_list_organizations`, `weeek_get_organization`, `weeek_create_organization`, `weeek_update_organization`, `weeek_delete_organization`, `weeek_list_contacts`, `weeek_get_contact`, `weeek_create_contact`, `weeek_update_contact`, `weeek_delete_contact`, `weeek_attach_contact`, `weeek_detach_contact`, `weeek_add_crm_tag`, `weeek_remove_crm_tag`, `weeek_add_detail`, `weeek_update_detail`, `weeek_delete_detail` | |
 | `all` | every toolset | |
 
-`weeek_version` is always available. The default is the task surface: 16 566 bytes of
-tool schemas per request; `crm` alone is 32 290 bytes; `all` is 76 321 bytes. An unknown name is
+`weeek_version` is always available. The default is the task surface: 16 871 bytes of
+tool schemas per request; `crm` alone is 32 290 bytes; `all` is 76 692 bytes. An unknown name is
 rejected at startup with the list of valid ones. Every operation of WEEEK's public API (157) is
 registered, and all but one reach a tool (`PATCH /crm/deals/{id}`: the API ignores most of its body,
 so `weeek_update_deal` uses `PUT` and the link routes instead) — the registry is checked against the

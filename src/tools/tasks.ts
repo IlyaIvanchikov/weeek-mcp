@@ -264,7 +264,7 @@ export function registerTaskTools({ server, client, resolver, attachPolicy, read
   server.registerTool(
     "weeek_create_tasks",
     {
-      description: "Create many WEEEK tasks in one call. Returns a per-item report; one bad name does not abort the batch.",
+      description: "Create up to 50 WEEEK tasks in one call. Each item takes the same fields as weeek_create_task: `title` and `project` (name or id) are required; `column`, `assignee`, `due`, `description`, `priority`, `type`, `parent` and `fields` are optional. Items are created in order and one bad name does not abort the batch: the reply is one entry per item, `{ ok: true, task }` or `{ ok: false, error, candidates? }`.",
       inputSchema: { tasks: z.array(z.object(createShape)).min(1).max(50) },
     },
     async (args) => {
