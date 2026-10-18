@@ -35,14 +35,21 @@ export function registerTaskLinkTools({ server, client, resolver }: ToolContext)
   }, async (args) => {
     const projectId = await resolver.resolve({ kind: "project", value: args.project });
     const boardColumnId = args.column === undefined ? undefined : await resolver.resolve({ kind: "column", value: args.column, scope: { projectId } });
-    return client.tasks.addLocation({ taskId: args.id, projectId, boardColumnId });
+    const task = await client.tasks.addLocation({ taskId: args.id, projectId, boardColumnId });
+    // A board's fields are read off its tasks (CustomFieldsApi.list), so a task that joins a project changes what its boards list.
+    resolver.forget({ kind: "customField" });
+    return task;
   });
 
   registerJsonTool(server, "weeek_remove_task_from_project", {
     description: "Remove a WEEEK task from one of its projects (by name or id); the task keeps its other projects. Requires confirm:true.",
     inputSchema: { id: taskId, project: nameOrId, confirm: confirmation },
     annotations: destructiveAnnotations,
-  }, async (args) => client.tasks.removeLocation({ taskId: args.id, projectId: await resolver.resolve({ kind: "project", value: args.project }) }));
+  }, async (args) => {
+    const task = await client.tasks.removeLocation({ taskId: args.id, projectId: await resolver.resolve({ kind: "project", value: args.project }) });
+    resolver.forget({ kind: "customField" });
+    return task;
+  });
 
   registerJsonTool(server, "weeek_set_task_parent", {
     description: "Make a WEEEK task a subtask of `parent` (a task id), or pass parent:null to detach it and make it top-level again.",

@@ -73,12 +73,12 @@ default and lets you opt into more. Set `WEEEK_TOOLSETS` to a comma-separated li
 | `crm` | `weeek_list_funnels`, `weeek_get_funnel`, `weeek_create_funnel`, `weeek_update_funnel`, `weeek_delete_funnel`, `weeek_list_statuses`, `weeek_get_status`, `weeek_create_status`, `weeek_update_status`, `weeek_delete_status`, `weeek_list_currencies`, `weeek_list_deals`, `weeek_get_deal`, `weeek_create_deal`, `weeek_update_deal`, `weeek_delete_deal`, `weeek_move_deal`, `weeek_add_deal_assignees`, `weeek_remove_deal_assignees`, `weeek_attach_organization`, `weeek_detach_organization`, `weeek_add_deal_task`, `weeek_move_deal_task`, `weeek_remove_deal_task`, `weeek_attach_deal_file`, `weeek_list_organizations`, `weeek_get_organization`, `weeek_create_organization`, `weeek_update_organization`, `weeek_delete_organization`, `weeek_list_contacts`, `weeek_get_contact`, `weeek_create_contact`, `weeek_update_contact`, `weeek_delete_contact`, `weeek_attach_contact`, `weeek_detach_contact`, `weeek_add_crm_tag`, `weeek_remove_crm_tag`, `weeek_add_detail`, `weeek_update_detail`, `weeek_delete_detail` | |
 | `all` | every toolset | |
 
-`weeek_version` is always available. The default is the task surface: 16 528 bytes of
-tool schemas per request; `crm` alone is 32 076 bytes; `all` is 75 872 bytes. An unknown name is
-rejected at startup with the list of valid ones. With 1.0.0 every operation of WEEEK's public
-API (157) is registered, and all but one reach a tool (`PUT /crm/deals/{id}`, a subset of the PATCH
-`weeek_update_deal` uses) — the registry is checked against the vendored OpenAPI
-document in both directions on every test run.
+`weeek_version` is always available. The default is the task surface: 16 566 bytes of
+tool schemas per request; `crm` alone is 32 290 bytes; `all` is 76 321 bytes. An unknown name is
+rejected at startup with the list of valid ones. Every operation of WEEEK's public API (157) is
+registered, and all but one reach a tool (`PATCH /crm/deals/{id}`: the API ignores most of its body,
+so `weeek_update_deal` uses `PUT` and the link routes instead) — the registry is checked against the
+vendored OpenAPI document in both directions on every test run.
 
 Custom-field **values** need no extra toolset: `weeek_get_task` returns them, and
 `weeek_create_task` / `weeek_update_task` take `fields: { "Estimate": 5, "Stage": "Review" }` by
@@ -93,6 +93,14 @@ tags by title. Deals carry custom-field values like tasks (`fields` by name; on
 `weeek_create_deal` pass `funnel` too). Addresses, emails and phones belong to
 organizations and contacts and are changed with `weeek_add_detail` / `weeek_update_detail` /
 `weeek_delete_detail`.
+
+Upgrading from 1.0.0: `weeek_create_task` / `weeek_update_task` `due` now actually sets the due date
+(the key sent before was ignored by the API); `weeek_update_deal` now applies custom fields and the
+four link lists, and lost `description` (the API only sets it on create);
+`weeek_create_organization` / `weeek_update_organization` take one `responsible` instead of
+`responsibles` (the list was ignored); `weeek_list_deals` lost `sort: "amount"` (the API answers 500);
+`weeek_update_project` `color` must now be `#` and six hex digits; a 200 the API marks
+`success: false` (e.g. a plan limit) is now reported as an error.
 
 Upgrading from 0.7.0: no tool was renamed or removed; `WEEEK_TOOLSETS=tasks` is still the
 default. Opt in with `crm` or `all`.

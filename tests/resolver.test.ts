@@ -291,6 +291,7 @@ describe("Resolver.resolve", () => {
     const client = crmClient();
     const r = new Resolver(client, freshCache());
     await expect(r.resolve({ kind: "deal", value: "Sale" })).rejects.toThrow(/resolving a deal by name needs a funnel or a status \(name or id\)/);
+    await expect(r.resolve({ kind: "deal", value: "ZZZZZZZZZZZZZZZZ" })).rejects.toThrow(/16-character value that is no deal's id is searched as a title/);
     const lookalike = dealOf("qkLffuJ4sQ1I8W7b", statusNew.id, "ProjectAlpha2026");
     client.crm.deals.list.mockResolvedValue({ deals: [lookalike], hasMore: false });
     expect(await r.resolve({ kind: "deal", value: "ProjectAlpha2026", scope: { statusId: statusNew.id } })).toBe(lookalike.id);

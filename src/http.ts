@@ -1,5 +1,6 @@
 import type { Config } from "./config.js";
 import type { Operation } from "./operations.js";
+import { asRecord } from "./api/responses.js";
 import { WeeekApiError, WeeekAuthError, WeeekTimeoutError } from "./errors.js";
 
 export type HttpConfig = Pick<Config, "token" | "baseUrl" | "timeoutMs">;
@@ -23,6 +24,25 @@ export function fillPath(template: string, params: PathParams = {}): string {
     if (text === "" || text === "." || text === "..") throw new Error(`invalid path parameter "${name}" for ${template}`);
     return encodeURIComponent(text);
   });
+}
+
+/**
+ * The API reports a refusal three ways (verified live 2026-10-15, FOLLOWUPS 24 "also found"):
+ * a `message`; a per-field `errors` map on a 422, with no message at all
+ * (`{ dueDate: ["The due date field is required when start date is present."] }`); and a 200
+ * whose body says `success: false` with a `reason` (`"limit"` when the workspace's plan lacks
+ * the feature). All three are errors to the caller, and this is the one place they are read.
+ */
+export function describeApiError(json: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (typeof json.message === "string" && json.message !== "") parts.push(json.message);
+  if (typeof json.errors === "object" && json.errors !== null) {
+    for (const [field, reasons] of Object.entries(json.errors as Record<string, unknown>)) {
+      parts.push(`${field}: ${Array.isArray(reasons) ? reasons.map(String).join(" ") : String(reasons)}`);
+    }
+  }
+  if (typeof json.reason === "string" && json.reason !== "") parts.push(`WEEEK refused the request (reason: ${json.reason})`);
+  return parts.length > 0 ? parts.join("; ") : "WEEEK API error";
 }
 
 export class HttpClient {
@@ -49,10 +69,11 @@ export class HttpClient {
       headers,
       body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
     });
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
-      throw new WeeekApiError(String(json.message ?? "WEEEK API error"), res.status, `http_${res.status}`);
-    }
+    // A literal `null` (or any non-object) body reads as empty, so the reads below never throw a TypeError.
+    const json = asRecord(await res.json().catch(() => ({})));
+    if (!res.ok) throw new WeeekApiError(describeApiError(json), res.status, `http_${res.status}`);
+    // A 200 can still be a refusal: `success: false` with a `reason`, which the start-date smoke hit (FOLLOWUPS 21 b).
+    if (json.success === false) throw new WeeekApiError(describeApiError(json), res.status, "refused");
     return json as T;
   }
 

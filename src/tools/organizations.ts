@@ -2,9 +2,8 @@ import { z } from "zod";
 import type { ToolContext } from "../toolsets/types.js";
 import { crmSorts } from "../api/constants.js";
 import { destructiveAnnotations } from "./constants.js";
-import { confirmation, nameOrId, nameOrIdList, nameOrIdListCap, page } from "./inputs.js";
+import { confirmation, nameOrId, nameOrIdListCap, page } from "./inputs.js";
 import { registerJsonTool } from "./json-tool.js";
-import { resolveMembers } from "./members.js";
 
 export const crmListShape = { search: z.string().min(1).optional(), sort: z.enum(crmSorts).optional(), ...page };
 /** Plain strings (an address, an email, a phone) given at creation; later ones go through weeek_add_detail. */
@@ -22,27 +21,27 @@ export function registerOrganizationTools({ server, client, resolver }: ToolCont
   }, async (args) => client.crm.organizations.get(await resolver.resolve({ kind: "organization", value: args.organization })));
 
   registerJsonTool(server, "weeek_create_organization", {
-    description: "Create a CRM organization: `name`, optional addresses, emails and phones (plain strings) and `responsibles` (members by name or id).",
-    inputSchema: { name: z.string().min(1), addresses: detailValues, emails: detailValues, phones: detailValues, responsibles: nameOrIdList.optional() },
+    description: "Create a CRM organization: `name`, optional addresses, emails and phones (plain strings) and one `responsible` member (by name or id).",
+    inputSchema: { name: z.string().min(1), addresses: detailValues, emails: detailValues, phones: detailValues, responsible: nameOrId.optional() },
   }, async (args) => {
-    const responsibles = args.responsibles === undefined ? undefined : await resolveMembers(resolver, args.responsibles);
-    const organization = await client.crm.organizations.create({ name: args.name, addresses: args.addresses, emails: args.emails, phones: args.phones, responsibles });
+    const responsibleId = args.responsible === undefined ? undefined : await resolver.resolve({ kind: "member", value: args.responsible });
+    const organization = await client.crm.organizations.create({ name: args.name, addresses: args.addresses, emails: args.emails, phones: args.phones, responsibleId });
     resolver.forget({ kind: "organization" });
     return organization;
   });
 
   registerJsonTool(server, "weeek_update_organization", {
-    description: "Rename a CRM organization (by name or id) or change its `responsibles` (members by name or id). Addresses, emails and phones are changed with the detail tools.",
-    inputSchema: { organization: nameOrId, name: z.string().min(1).optional(), responsibles: nameOrIdList.optional() },
+    description: "Rename a CRM organization (by name or id) or change its `responsible` (a member by name or id; null clears). Addresses, emails and phones are changed with the detail tools.",
+    inputSchema: { organization: nameOrId, name: z.string().min(1).optional(), responsible: nameOrId.nullable().optional() },
   }, async (args) => {
     const organizationId = await resolver.resolve({ kind: "organization", value: args.organization });
-    // Read fresh: a cached search entry can be 60 s old and PUT replaces.
+    // Read fresh: a cached search entry can be 60 s old and PUT replaces name and responsibleId.
     const currentOrganization = await client.crm.organizations.get(organizationId);
-    // PUT replaces; the detail arrays are omitted on purpose so the API keeps them (FOLLOWUPS 24 c).
-    const responsibles = args.responsibles === undefined
-      ? (currentOrganization.responsibleId === null ? [] : [currentOrganization.responsibleId])
-      : await resolveMembers(resolver, args.responsibles);
-    const organization = await client.crm.organizations.update({ organizationId, update: { name: args.name ?? currentOrganization.name, responsibles } });
+    const responsibleId = args.responsible === undefined
+      ? currentOrganization.responsibleId
+      : args.responsible === null ? null : await resolver.resolve({ kind: "member", value: args.responsible });
+    // The detail arrays are omitted on purpose so the API keeps them (FOLLOWUPS 24 c).
+    const organization = await client.crm.organizations.update({ organizationId, update: { name: args.name ?? currentOrganization.name, responsibleId } });
     resolver.forget({ kind: "organization" });
     return organization;
   });

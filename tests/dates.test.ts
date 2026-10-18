@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDay, parseDateTime } from "../src/dates.js";
+import { parseDay, parseDateTime, formatDayMonthYear } from "../src/dates.js";
 
 const now = new Date("2026-07-14T12:00:00Z"); // Tuesday
 
@@ -22,5 +22,14 @@ describe("parseDateTime", () => {
   });
   it("throws on nonsense", () => {
     expect(() => parseDateTime("banana", now)).toThrow(/could not parse date/);
+  });
+});
+
+describe("formatDayMonthYear", () => {
+  it("turns a Y-m-d day into the d.m.Y the task-create route wants", () => {
+    expect(formatDayMonthYear("2026-11-20")).toBe("20.11.2026");
+  });
+  it("refuses anything that is not a Y-m-d day", () => {
+    expect(() => formatDayMonthYear("20.11.2026")).toThrow(/Y-m-d/);
   });
 });

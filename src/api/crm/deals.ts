@@ -1,6 +1,6 @@
 import type { HttpClient } from "../../http.js";
 import { operations } from "../../operations.js";
-import { asRecord, isOneOf, pickArray, stringList } from "../responses.js";
+import { asRecord, isOneOf, pickArray, stringList, tagIdList } from "../responses.js";
 import { attachmentForm, orNullWhenMissing, pickAttachments } from "../requests.js";
 import { dealOutcomes } from "../constants.js";
 import { toFieldValue } from "../custom-fields.js";
@@ -46,7 +46,7 @@ export function toDeal(raw: unknown): Deal {
     assignees: stringList(r.assignees),
     organizations: stringList(r.organizations),
     contacts: stringList(r.contacts),
-    tags: Array.isArray(r.tags) ? r.tags.map(Number) : [],
+    tags: tagIdList(r.tags),
     tasks: Array.isArray(r.tasks) ? r.tasks.map((task) => Number(asRecord(task).id)) : [],
     customFields: Array.isArray(r.customFields) ? r.customFields.map(toFieldValue) : [],
     attachments: Array.isArray(r.attachments) ? (r.attachments as Attachment[]) : [],
@@ -83,7 +83,7 @@ export class DealsApi {
     return toDeal(json.deal);
   }
 
-  // PATCH answers with success only, so the deal is re-read.
+  // PATCH answers with success only, so the deal is re-read. Kept for the operation registry: live it ignores most of its body (FOLLOWUPS 24 f), so weeek_update_deal uses `replace`.
   async update({ dealId, patch }: UpdateDealOptions): Promise<Deal> {
     await this.http.execute<SuccessResponse>(ops.update, { params: { dealId }, body: dealBody(patch) });
     return this.get(dealId);

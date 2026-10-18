@@ -90,6 +90,16 @@ describe("CustomFieldsApi writes", () => {
     expect(sent(f).json()).toEqual({ name: "Estimate", type: "number", config: { type: "number", precision: 1 } });
   });
 
+  it("create reads the field from `data` when the route answers that way — the board route does (FOLLOWUPS 23 a)", async () => {
+    const f = jsonFetch(200, { success: true, data: { id: fieldId, name: "Lane", type: "text" } });
+    expect(await api(f).create({ scope: boardScope, field: { name: "Lane", type: "text" } })).toEqual({ id: fieldId, name: "Lane", type: "text", config: null, options: [] });
+  });
+
+  it("createOption reads the option from `data` too", async () => {
+    const f = jsonFetch(200, { success: true, data: { id: optionId, name: "Review", color: "#FFCC48" } });
+    expect(await api(f).createOption({ scope: boardScope, fieldId, option: { name: "Review", color: "blue" } })).toEqual({ id: optionId, name: "Review", color: "#FFCC48" });
+  });
+
   it("update PUTs only the fields given and returns the field", async () => {
     const f = jsonFetch(200, { success: true, customField: rawField });
     expect(await api(f).update({ scope: projectScope, fieldId, update: { name: "Phase" } })).toEqual(field);

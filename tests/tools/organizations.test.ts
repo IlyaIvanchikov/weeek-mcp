@@ -23,18 +23,21 @@ describe("organization tools", () => {
     expect(c.crm.organizations.list).toHaveBeenCalledWith({ search: "acme", limit: 50 });
     expect(c.crm.organizations.get).toHaveBeenCalledWith(acme.id);
   });
-  it("weeek_create_organization resolves responsibles by name and sends the details as given", async () => {
+  it("weeek_create_organization resolves the responsible by name and sends it as responsibleId", async () => {
     const { c, h } = harness();
-    await h.call("weeek_create_organization", { name: "Acme", emails: ["kot@gmail.com"], responsibles: ["Ann"] });
-    expect(c.crm.organizations.create).toHaveBeenCalledWith({ name: "Acme", addresses: undefined, emails: ["kot@gmail.com"], phones: undefined, responsibles: [ann.id] });
+    await h.call("weeek_create_organization", { name: "Acme", emails: ["kot@gmail.com"], responsible: "Ann" });
+    expect(c.crm.organizations.create).toHaveBeenCalledWith({ name: "Acme", addresses: undefined, emails: ["kot@gmail.com"], phones: undefined, responsibleId: ann.id });
+    await h.call("weeek_create_organization", { name: "Beta" });
+    expect(c.crm.organizations.create).toHaveBeenLastCalledWith({ name: "Beta", addresses: undefined, emails: undefined, phones: undefined, responsibleId: undefined });
   });
-  it("weeek_update_organization keeps the current name and responsible and never sends the detail arrays", async () => {
+  it("weeek_update_organization keeps, replaces or clears the responsible, and never sends the detail arrays", async () => {
     const { c, h } = harness();
-    await h.call("weeek_update_organization", { organization: acme.id, responsibles: ["Ann"] });
-    expect(c.crm.organizations.update).toHaveBeenCalledWith({ organizationId: acme.id, update: { name: "Acme", responsibles: [ann.id] } });
-    c.crm.organizations.tryGet.mockResolvedValueOnce(acme);
     await h.call("weeek_update_organization", { organization: acme.id, name: "Acme 2" });
-    expect(c.crm.organizations.update).toHaveBeenLastCalledWith({ organizationId: acme.id, update: { name: "Acme 2", responsibles: [ilya.id] } });
+    expect(c.crm.organizations.update).toHaveBeenCalledWith({ organizationId: acme.id, update: { name: "Acme 2", responsibleId: ilya.id } });
+    await h.call("weeek_update_organization", { organization: acme.id, responsible: "Ann" });
+    expect(c.crm.organizations.update).toHaveBeenLastCalledWith({ organizationId: acme.id, update: { name: "Acme", responsibleId: ann.id } });
+    await h.call("weeek_update_organization", { organization: acme.id, responsible: null });
+    expect(c.crm.organizations.update).toHaveBeenLastCalledWith({ organizationId: acme.id, update: { name: "Acme", responsibleId: null } });
   });
   it("weeek_update_organization builds the PUT body from a fresh read, not the cached search entry", async () => {
     const { c, h } = harness();
@@ -42,7 +45,7 @@ describe("organization tools", () => {
     c.crm.organizations.get.mockResolvedValueOnce(renamed);
     await h.call("weeek_update_organization", { organization: "Acme" });
     expect(c.crm.organizations.get).toHaveBeenCalledWith(acme.id);
-    expect(c.crm.organizations.update).toHaveBeenCalledWith({ organizationId: acme.id, update: { name: renamed.name, responsibles: [ann.id] } });
+    expect(c.crm.organizations.update).toHaveBeenCalledWith({ organizationId: acme.id, update: { name: renamed.name, responsibleId: ann.id } });
   });
   it("weeek_delete_organization needs confirm:true and forgets the cached searches", async () => {
     const { c, h } = harness();

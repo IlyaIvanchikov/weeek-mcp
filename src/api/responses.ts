@@ -55,3 +55,20 @@ export function toWorkspace(raw: unknown): Workspace {
 export function pageHasMore(count: number, limit: number | undefined): boolean {
   return limit !== undefined && count >= limit;
 }
+
+/**
+ * The entity a write answers with. The spec puts it under its own key (`customField`, `option`);
+ * the board custom-field routes put it under `data` instead (verified 2026-10-15, FOLLOWUPS 23 a).
+ */
+export function pickEntity(obj: Record<string, unknown>, key: string): unknown {
+  return obj[key] ?? obj.data;
+}
+
+/**
+ * A tag list as ids. The deal routes send `{ id, title, color }` objects, the task, organization
+ * and contact routes plain ids (verified 2026-10-15, FOLLOWUPS 24); anything else is empty.
+ */
+export function tagIdList(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((tag) => Number(typeof tag === "object" && tag !== null ? asRecord(tag).id : tag));
+}
